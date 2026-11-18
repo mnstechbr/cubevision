@@ -1,4 +1,4 @@
-import { BoxGeometry, CircleGeometry, Group, LineSegments, Mesh, Vector3 } from 'three/webgpu';
+import { BoxGeometry, CircleGeometry, CylinderGeometry, Group, LineSegments, Mesh, Vector3 } from 'three/webgpu';
 import { Lines, layerBase, rng } from '../engine/build';
 import { CYAN, ICE, fillMaterial, lineMaterial, targetMaterial } from '../engine/holo';
 import type { LayerContext, Layer } from '../engine/layers';
@@ -36,14 +36,14 @@ export function create(ctx: LayerContext): Layer {
     const s = Math.sin(a);
     table.seg(c * 2.0, 0, s * 2.0, c * 2.6, 0.75, s * 2.6).seg(c * 2.6, 0.75, s * 2.6, c * 2.6, 0.9, s * 2.6);
   }
-  root.add(new LineSegments(table.geometry(), dim(0.55)));
-  const top = new Mesh(new CircleGeometry(2.6, 64).rotateX(-Math.PI / 2).translate(0, 0.9, 0), fillMaterial(fade, CYAN, 0.25));
+  root.add(new LineSegments(table.geometry(), dim(0.38)));
+  const top = new Mesh(new CircleGeometry(2.6, 64).rotateX(-Math.PI / 2).translate(0, 0.9, 0), fillMaterial(fade, CYAN, 0.08));
   top.userData.noSample = true;
   root.add(top);
 
   const emitter = new Lines();
   for (let r = 0.4; r <= 2.41; r += 0.4) emitter.circle(0, 0.91, 0, r, 64, false, 0, Math.PI * (1.2 + r * 0.3));
-  const rings = new LineSegments(emitter.geometry(), dim(0.6));
+  const rings = new LineSegments(emitter.geometry(), dim(0.4));
   root.add(rings);
 
   const beam = new Lines();
@@ -51,14 +51,18 @@ export function create(ctx: LayerContext): Layer {
     const a = (i / 36) * Math.PI * 2;
     beam.seg(Math.cos(a) * 1.1, 0.92, Math.sin(a) * 1.1, Math.cos(a) * 0.8, 1.95, Math.sin(a) * 0.8);
   }
-  root.add(new LineSegments(beam.geometry(), lineMaterial(fade, ICE, 0.16)));
+  root.add(new LineSegments(beam.geometry(), lineMaterial(fade, ICE, 0.12)));
+  // Volumetric projection cone from the emitter up to the cube.
+  const cone = new Mesh(new CylinderGeometry(0.75, 1.15, 1.05, 48, 1, true).translate(0, 1.44, 0), fillMaterial(fade, ICE, 0.28));
+  cone.userData.noSample = true;
+  root.add(cone);
 
   // The cube: nested shells, gridded faces.
   const cube = new Group();
   cube.position.y = CUBE_Y;
   root.add(cube);
   const shell = new Lines().box(-CUBE, -CUBE, -CUBE, CUBE * 2, CUBE * 2, CUBE * 2);
-  cube.add(new LineSegments(shell.geometry(), lineMaterial(fade, ICE, 1)));
+  cube.add(new LineSegments(shell.geometry(), lineMaterial(fade, ICE, 1.4)));
   const grid = new Lines();
   const steps = Math.round(4 + ctx.detail * 4);
   for (let i = 1; i < steps; i++) {
@@ -69,7 +73,7 @@ export function create(ctx: LayerContext): Layer {
       grid.seg(v, s, -CUBE, v, s, CUBE).seg(-CUBE, s, v, CUBE, s, v); // top/bottom
     }
   }
-  cube.add(new LineSegments(grid.geometry(), dim(0.22)));
+  cube.add(new LineSegments(grid.geometry(), dim(0.3)));
   const fill = new Mesh(new BoxGeometry(CUBE * 2, CUBE * 2, CUBE * 2), fillMaterial(fade, CYAN, 0.3));
   fill.userData.noSample = true;
   cube.add(fill);

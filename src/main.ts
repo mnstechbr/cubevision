@@ -1,5 +1,6 @@
 import './style.css';
 import { Dive, type DiveHost } from './engine/dive';
+import { createDust } from './engine/dust';
 import { holo } from './engine/holo';
 import { ORDER, loadLayer, nextOf, type Layer, type LayerId } from './engine/layers';
 import { Orbit } from './engine/orbit';
@@ -44,6 +45,8 @@ async function boot() {
   const particles = new Particles(30000);
   scene.add(particles.object);
   const orbit = new Orbit(camera, reducedMotion);
+  const dust = createDust(touchFirst ? 300 : 900);
+  scene.add(dust.object);
   const governor = createGovernor(
     (level) => {
       stage.setQuality(level);
@@ -140,6 +143,7 @@ async function boot() {
     const t = now / 1000;
     governor.tick(dt);
     orbit.update(dt);
+    dust.scale.value = orbit.now.distance;
     dive.update(dt);
     const cur = host.current;
     if (dive.state === 'idle') cur.glow.value += ((hovered ? 0.75 : 0) - cur.glow.value) * Math.min(1, dt * 6);
