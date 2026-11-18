@@ -2,6 +2,9 @@ import type { Cursor } from '../ui';
 import { Gestures, handDistance, type HandFrame } from './gestures';
 import type { Intents } from './pointer';
 
+/** Live tracker diagnostics, shown with ?debug. */
+export const tracker = { text: '' };
+
 export interface HandsSession {
   /** With ?gravar: the landmark numbers seen so far as JSON (no images), or null. */
   recording(): string | null;
@@ -70,12 +73,17 @@ async function fetchAssets(onProgress: (p: number) => void) {
 
 export async function startHands(o: Options): Promise<HandsSession> {
   let stream = await openCamera();
+  let delegate = '?';
   const worker = new Worker(new URL('./hands.worker.ts', import.meta.url), { type: 'module' });
   try {
     const model = await timeout(fetchAssets(o.onProgress), MODEL_TIMEOUT, 'hand model');
     await timeout(
       new Promise<void>((resolve, reject) => {
-        worker.onmessage = (e) => (e.data.type === 'ready' ? resolve() : reject(new Error(e.data.message)));
+        worker.onmessage = (e) => {
+          if (e.data.type !== 'ready') return reject(new Error(e.data.message));
+          delegate = e.data.delegate;
+          resolve();
+        };
         worker.onerror = (e) => reject(new Error(e.message));
         worker.postMessage({ type: 'init', model }, [model]);
       }),
@@ -101,6 +109,7 @@ export async function startHands(o: Options): Promise<HandsSession> {
   let lastCoach = 0;
 
   const gestures = new Gestures(o.intents);
+  const stats = { frames: 0, found: 0, since: performance.now() };
   // Calibration aid: only numbers (21 points per hand), capped at ~3 min, never sent anywhere.
   const rec = new URLSearchParams(location.search).has('gravar') ? ([] as { t: number; hands: { label: string; lm: number[] }[] }[]) : null;
   let busy = false;
@@ -111,6 +120,15 @@ export async function startHands(o: Options): Promise<HandsSession> {
     if (e.data.type !== 'result') return;
     busy = false;
     const hands = e.data.hands as HandFrame[];
+    // Diagnostics for ?debug: tracker speed and how often a hand is actually found.
+    stats.frames++;
+    if (hands.length) stats.found++;
+    if (e.data.t - stats.since > 1000) {
+      const s = video.srcObject instanceof MediaStream ? video.srcObject.getVideoTracks()[0]?.getSettings() : undefined;
+      tracker.text = `tracker ${delegate} ${Math.round((stats.frames * 1000) / (e.data.t - stats.since))} fps · hand found ${Math.round((stats.found / Math.max(1, stats.frames)) * 100)}% · camera ${s?.width}×${s?.height} @${Math.round(s?.frameRate ?? 0)}`;
+      stats.frames = stats.found = 0;
+      stats.since = e.data.t;
+    }
     if (rec && rec.length < 6000) rec.push({ t: Math.round(e.data.t), hands: hands.map((h) => ({ label: h.label, lm: Array.from(h.landmarks, (v) => Math.round(v * 1e4) / 1e4) })) });
     o.onCursors(gestures.update(hands, e.data.t));
     drawSkeleton(g, sk.width, sk.height, hands);

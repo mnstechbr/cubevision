@@ -89,3 +89,35 @@ describe('target hit test', () => {
     expect(dive.hits(c.x + 0.6, c.y)).toBe(false);
   });
 });
+
+describe('zooming through the target', () => {
+  async function at(yaw: number, id: 'room' | 'city' = 'room') {
+    const camera = new PerspectiveCamera(50, 16 / 9, 0.1, 1000);
+    const orbit = new Orbit(camera, false);
+    const room = await loadLayer(id, ctx);
+    orbit.apply(room.view, true);
+    orbit.goal.yaw = orbit.now.yaw = yaw;
+    orbit.update(1 / 60);
+    const host = { scene: new Scene(), camera, orbit, particles: new Particles(10), current: room, reducedMotion: false, next: () => null, arrived() {} };
+    return { dive: new Dive(host), orbit };
+  }
+  const zoomIn = (dive: Dive, orbit: Orbit) => {
+    for (let i = 0; i < 240 && dive.state === 'idle'; i++) {
+      dive.zoom(0.97, 0.3);
+      orbit.update(1 / 60);
+    }
+  };
+
+  it('moving in with the spot in the reticle ends in a dive', async () => {
+    const { dive, orbit } = await at(0);
+    zoomIn(dive, orbit);
+    expect(dive.state).toBe('focus');
+  });
+
+  it('moving in elsewhere just stops at the closest distance', async () => {
+    const { dive, orbit } = await at(Math.PI / 2, 'city'); // the city's spot is far off to the side from here
+    zoomIn(dive, orbit);
+    expect(dive.state).toBe('idle');
+    expect(orbit.goal.distance).toBeCloseTo(orbit.minDistance, 5);
+  });
+});

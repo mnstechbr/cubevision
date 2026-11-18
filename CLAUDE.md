@@ -50,17 +50,16 @@ Não é realista nem cartoon. O detalhe vem da **densidade de linhas e partícul
 
 Fluxo: **câmera → MediaPipe (21 pontos por mão) → filtro de suavização → máquina de estados de gestos → ação na cena**
 
-| Gesto | Ação |
+| Gesto (uma mão aberta) | Ação |
 |---|---|
-| Mão aberta | Só mostra onde a mão está (acende o alvo embaixo dela) |
-| **Fechar a mão e mover** | Agarra o holograma: ele gira junto com a mão |
-| Abrir a mão | Solta; o mundo continua girando com inércia |
-| Duas mãos fechadas, juntas | Mover gira, torcer inclina, afastar aproxima |
-| **Duas mãos fechadas sobre o alvo, afastando** | Rasga o alvo e mergulha (nada mergulha sozinho) |
+| Mover a palma | Gira o mundo, como empurrar um globo |
+| Aproximar a mão da câmera / afastar | Aproxima / volta (zoom nos dois sentidos) |
+| Ponto que brilha na mira do centro + aproximar | A câmera vai até ele e, no limite, atravessa: o mergulho |
+| Abaixar a mão | Descansa; ao voltar, continua de onde estava |
 
-> Histórico (2026-11-18): pinça, "parar em cima" (dwell) e cursor nas bordas foram testados com webcam real e rejeitados: frágeis ou com cara de mouse. Mão aberta × fechada é o que a webcam lê com mais confiança. Para calibrar com dados reais: `?gravar` salva só os números dos pontos da mão (sem imagem) e `?debug` mostra a leitura ao vivo.
+> Histórico (2026-11-18), testado com webcam real e rejeitado: pinça, "parar em cima" (dwell), cursor nas bordas, punho fechado para agarrar e gestos de duas mãos. Motivos: o detector do MediaPipe acha a **palma**; punho e duas mãos fazem a mão "sumir", e mirar cansa o braço. Também rejeitado: mira automática (tira o controle). Diagnóstico: `?debug` mostra fps do rastreador, % de quadros com mão e resolução real da câmera; `?gravar` salva só os números dos pontos da mão.
 
-- **Profundidade:** webcam não mede bem a profundidade, então "empurrar" é aproximado pelo **tamanho da mão na imagem**. Os gestos principais não dependem disso.
+- **Profundidade:** webcam não mede profundidade; aproximar/afastar a mão é lido pelo **tamanho da mão na imagem** (palma + largura), que é estável com a palma aberta.
 - **Suavização:** filtro *One Euro* nos pontos, senão a cena treme junto com a mão.
 - **Feedback imediato:** cursor holográfico da mão sempre visível, que reage antes da ação concluir.
 - **Modo sem câmera (obrigatório):** mouse, trackpad e **toque** pelo mesmo código de *Pointer Events* (arrastar = girar, soltar em movimento = inércia, scroll/pinça de dois dedos = zoom, clique/toque no alvo = mergulhar). Muita gente vai negar a câmera e a experiência não pode morrer aí. No celular é o modo padrão.

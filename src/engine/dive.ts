@@ -36,7 +36,6 @@ export class Dive {
   private yaw = 0;
   private incoming: Layer | null = null;
   private center2 = new Vector3();
-  private previewBase = 0;
   private edge = new Vector3();
   private quat = new Quaternion();
   private normal = new Vector3();
@@ -58,7 +57,7 @@ export class Dive {
    * Is the cursor (NDC) on the current target? Measured on screen, with a minimum size,
    * so a small or far target is still easy to hit with a shaky hand.
    */
-  hits(x: number, y: number) {
+  hits(x: number, y: number, minReach = 0.1) {
     const { camera, current } = this.host;
     const target = current.target;
     camera.updateMatrixWorld();
@@ -74,27 +73,31 @@ export class Dive {
     if (this.center2.z > 1) return false; // behind the camera
     const a = camera.aspect;
     const radius = Math.hypot((this.edge.x - this.center2.x) * a, this.edge.y - this.center2.y);
-    const reach = Math.max(radius * 1.6, 0.1);
+    const reach = Math.max(radius * 1.6, minReach);
     return Math.hypot((x - this.center2.x) * a, y - this.center2.y) < reach;
   }
 
-  /** 0..1 preview of tearing the target open (it swells and burns brighter). */
-  preview(amount: number) {
+  /**
+   * Zoom that knows about the target: moving in while it is in the reticle (within `aim` of the
+   * screen center) heads for it and, once as close as the world allows, goes through: the dive.
+   * Moving out drifts back to the world's own center.
+   */
+  zoom(f: number, aim: number) {
     if (this.busy) return;
-    const o = this.host.current.target.object;
-    if (!this.previewBase) this.previewBase = o.scale.x;
-    const a = MathUtils.clamp(amount, 0, 1);
-    o.scale.setScalar(this.previewBase * (1 + a * 0.45));
-    this.host.current.glow.value = Math.max(this.host.current.glow.value, a);
-    if (a === 0) this.previewBase = 0;
+    const { orbit, current } = this.host;
+    if (f < 1 && this.hits(0, 0, aim)) {
+      current.target.object.getWorldPosition(this.center);
+      orbit.goal.target.lerp(this.center, Math.min(1, (1 - f) * 3));
+      if (orbit.goal.distance <= orbit.minDistance * 1.02) return this.start();
+    } else if (f > 1) {
+      this.center.set(0, current.view.height, 0);
+      orbit.goal.target.lerp(this.center, Math.min(1, (f - 1) * 2));
+    }
+    orbit.zoom(f);
   }
 
   start() {
     if (this.busy) return;
-    if (this.previewBase) {
-      this.host.current.target.object.scale.setScalar(this.previewBase);
-      this.previewBase = 0;
-    }
     this.state = 'focus';
     this.t = 0;
     this.host.orbit.locked = true;

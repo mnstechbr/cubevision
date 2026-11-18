@@ -15,13 +15,15 @@ self.onmessage = async (e: MessageEvent) => {
         HandLandmarker.createFromOptions(fileset, {
           baseOptions: { modelAssetBuffer: model, delegate },
           runningMode: 'VIDEO',
-          numHands: 2,
-          minHandDetectionConfidence: 0.5,
-          minHandPresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+          // One hand, and slow to give up on it: once found, keep following through blur and odd poses.
+          numHands: 1,
+          minHandDetectionConfidence: 0.4,
+          minHandPresenceConfidence: 0.3,
+          minTrackingConfidence: 0.3,
         });
-      landmarker = await make('GPU').catch(() => make('CPU'));
-      post({ type: 'ready' });
+      let delegate = 'GPU';
+      landmarker = await make('GPU').catch(() => ((delegate = 'CPU'), make('CPU')));
+      post({ type: 'ready', delegate });
     } catch (err) {
       post({ type: 'error', message: String(err) });
     }

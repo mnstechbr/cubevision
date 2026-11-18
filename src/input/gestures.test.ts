@@ -1,30 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Gestures, fingerReach, handDistance, type HandFrame } from './gestures';
+import { Gestures, handDistance, handSize, type HandFrame } from './gestures';
 import type { Intents } from './pointer';
 
-/** A plausible hand with its palm centered at (cx, cy) in image space. `fist` folds the four fingers. */
-function hand(cx: number, cy: number, fist = false, label = 'Right'): HandFrame {
+/** An open hand with its palm at (cx, cy) in image space, `scale` times its normal size. */
+function hand(cx: number, cy: number, scale = 1): HandFrame {
   const p: [number, number][] = Array.from({ length: 21 }, () => [cx, cy]);
-  p[0] = [cx, cy + 0.12]; // wrist
+  const s = (dx: number, dy: number): [number, number] => [cx + dx * scale, cy + dy * scale];
+  p[0] = s(0, 0.12);
   for (const [mcp, pip, tip, dx] of [[5, 6, 8, -0.04], [9, 10, 12, 0], [13, 14, 16, 0.03], [17, 18, 20, 0.06]]) {
-    p[mcp] = [cx + dx, cy - 0.03];
-    p[pip] = [cx + dx, cy - 0.08];
-    p[tip] = fist ? [cx + dx, cy] : [cx + dx, cy - 0.15];
+    p[mcp] = s(dx, -0.03);
+    p[pip] = s(dx, -0.08);
+    p[tip] = s(dx, -0.15);
   }
-  p[4] = [cx - 0.1, cy - 0.02];
+  p[4] = s(-0.1, -0.02);
   const lm = new Float32Array(63);
   p.forEach(([x, y], i) => lm.set([x, y, 0], i * 3));
-  return { label, landmarks: lm };
+  return { label: 'Right', landmarks: lm };
 }
 
-function setup(onTarget = () => false) {
+function setup(centered = () => false) {
   const intents: Intents = {
     rotate: vi.fn(),
     zoom: vi.fn(),
-    hover: vi.fn(() => onTarget()),
+    hover: vi.fn(() => centered()),
     select: vi.fn(),
     activate: vi.fn(),
-    pull: vi.fn(),
     fling: vi.fn(),
   };
   return { g: new Gestures(intents), intents };
@@ -34,62 +34,62 @@ const run = (g: Gestures, frames: (i: number) => HandFrame[], n: number, t0 = 0)
   for (let i = 0; i < n; i++) g.update(frames(i), t0 + i * 33);
 };
 
-describe('Gestures', () => {
-  it('reads open hands and fists apart', () => {
-    expect(fingerReach(hand(0.5, 0.5).landmarks)).toBeGreaterThan(1.2);
-    expect(fingerReach(hand(0.5, 0.5, true).landmarks)).toBeLessThan(0.9);
-  });
-
-  it('an open hand only points: it never turns the world', () => {
+describe('Gestures (one open hand)', () => {
+  it('moving the open palm turns the world, after a short settle', () => {
     const { g, intents } = setup();
-    run(g, (i) => [hand(0.3 + i * 0.02, 0.5)], 15);
-    expect(intents.hover).toHaveBeenCalled();
-    expect(intents.rotate).not.toHaveBeenCalled();
-  });
-
-  it('a closed hand grabs: moving it turns the world, opening it throws the spin', () => {
-    const { g, intents } = setup();
-    // Image x going down = moving to the right on the (mirrored) screen, like dragging right.
-    run(g, (i) => [hand(0.7 - i * 0.02, 0.5, true)], 12);
+    run(g, (i) => [hand(0.7 - i * 0.01, 0.5)], 20);
     const yaws = vi.mocked(intents.rotate).mock.calls.map((c) => c[0]);
-    expect(yaws.length).toBeGreaterThan(5);
-    expect(yaws.every((y) => y > 0)).toBe(true);
-    g.update([hand(0.46, 0.5)], 12 * 33); // open
-    expect(intents.fling).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(intents.fling).mock.calls[0][0]).toBeGreaterThan(0);
+    expect(yaws.length).toBeGreaterThan(8);
+    expect(yaws.every((y) => y > 0)).toBe(true); // to the right on screen, like dragging right
   });
 
-  it('two open hands do nothing to the camera', () => {
+  it('raising the hand into view does not jerk the world', () => {
     const { g, intents } = setup();
-    run(g, (i) => [hand(0.4 - i * 0.02, 0.5, false, 'Left'), hand(0.6 + i * 0.02, 0.5)], 12);
+    run(g, (i) => [hand(0.5, 0.8 - i * 0.05)], 6); // 200 ms of the hand coming up
+    expect(intents.rotate).not.toHaveBeenCalled();
+  });
+
+  it('a brief tracking dropout keeps the hand (no flicker, no jump)', () => {
+    const { g, intents } = setup();
+    run(g, () => [hand(0.5, 0.5)], 15);
+    expect(g.update([], 15 * 33)).toHaveLength(1); // still shown
+    g.update([], 16 * 33);
+    g.update([hand(0.5, 0.5)], 17 * 33);
+    expect(intents.rotate).not.toHaveBeenCalled();
+  });
+
+  it('bringing the hand closer moves in; pulling it back moves out', () => {
+    const closer = setup();
+    run(closer.g, () => [hand(0.5, 0.5)], 15);
+    run(closer.g, (i) => [hand(0.5, 0.5, 1 + i * 0.02)], 15, 15 * 33);
+    const inF = vi.mocked(closer.intents.zoom).mock.calls.map((c) => c[0]);
+    expect(inF.length).toBeGreaterThan(5);
+    expect(inF.every((f) => f < 1)).toBe(true);
+
+    const back = setup();
+    run(back.g, () => [hand(0.5, 0.5)], 15);
+    run(back.g, (i) => [hand(0.5, 0.5, 1 - i * 0.015)], 15, 15 * 33);
+    const outF = vi.mocked(back.intents.zoom).mock.calls.map((c) => c[0]);
+    expect(outF.length).toBeGreaterThan(5);
+    expect(outF.every((f) => f > 1)).toBe(true);
+  });
+
+  it('moving in does not also turn the world', () => {
+    const { g, intents } = setup();
+    run(g, () => [hand(0.5, 0.5)], 15);
+    run(g, (i) => [hand(0.5, 0.5, 1 + i * 0.04)], 10, 15 * 33);
+    expect(intents.rotate).not.toHaveBeenCalled();
+  });
+
+  it('a steady hand does nothing', () => {
+    const { g, intents } = setup();
+    run(g, () => [hand(0.5, 0.5)], 60);
+    expect(intents.rotate).not.toHaveBeenCalled();
     expect(intents.zoom).not.toHaveBeenCalled();
-    expect(intents.rotate).not.toHaveBeenCalled();
-    expect(intents.activate).not.toHaveBeenCalled();
   });
 
-  it('two fists pulled apart away from the target zoom, and never dive', () => {
-    const { g, intents } = setup(() => false);
-    run(g, (i) => [hand(0.4 - i * 0.02, 0.5, true, 'Left'), hand(0.6 + i * 0.02, 0.5, true)], 12);
-    expect(vi.mocked(intents.zoom).mock.calls.some((c) => c[0] < 1)).toBe(true);
-    expect(intents.activate).not.toHaveBeenCalled();
-  });
-
-  it('two fists grabbing the glowing spot and pulling apart tear it open and dive, once', () => {
-    const { g, intents } = setup(() => true);
-    run(g, (i) => [hand(0.42 - i * 0.015, 0.5, true, 'Left'), hand(0.58 + i * 0.015, 0.5, true)], 20);
-    const pulls = vi.mocked(intents.pull).mock.calls.map((c) => c[0]);
-    expect(Math.max(...pulls)).toBe(1);
-    expect(intents.activate).toHaveBeenCalledTimes(1);
-  });
-
-  it('a hand that leaves and comes back elsewhere does not jump or throw', () => {
-    const { g, intents } = setup();
-    run(g, () => [hand(0.45, 0.5, true)], 5);
-    g.update([], 200);
-    g.update([hand(0.6, 0.5, true)], 800);
-    g.update([hand(0.6, 0.5, true)], 833);
-    expect(intents.rotate).not.toHaveBeenCalled();
-    expect(intents.fling).not.toHaveBeenCalled();
+  it('hand size grows when the hand comes closer', () => {
+    expect(handSize(hand(0.5, 0.5, 1.3).landmarks)).toBeGreaterThan(handSize(hand(0.5, 0.5).landmarks) * 1.25);
   });
 });
 

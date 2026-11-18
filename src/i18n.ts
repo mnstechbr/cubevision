@@ -17,9 +17,9 @@ const dict = {
     camDenied: 'Câmera indisponível. Seguindo com o mouse.',
     handClose: 'Mão muito perto da câmera. Afaste um pouco (uns 50 cm).',
     handFar: 'Mão muito longe. Chegue um pouco mais perto da câmera.',
-    hintMouse: 'Arraste para girar · role para aproximar · clique no ponto que brilha',
+    hintMouse: 'Arraste para girar · role para aproximar ou afastar · clique no ponto que brilha (ou aproxime até atravessar)',
     hintTouch: 'Arraste para girar · pinça para aproximar · toque no ponto que brilha',
-    hintHands: 'Feche a mão para agarrar e girar · solte para deixar girando · feche as duas mãos sobre o ponto que brilha e afaste para abrir',
+    hintHands: 'Mão aberta: mova para girar · aproxime a mão da câmera para chegar perto, afaste para voltar · ponha o ponto que brilha na mira e aproxime até atravessar',
     hintFind: 'Algo brilha atrás do cubo…',
     layer: 'camada',
     names: {
@@ -52,9 +52,9 @@ const dict = {
     camDenied: 'Camera unavailable. Continuing with the mouse.',
     handClose: 'Hand too close to the camera. Move back a little (about 50 cm).',
     handFar: 'Hand too far. Come a little closer to the camera.',
-    hintMouse: 'Drag to turn · scroll to zoom · click the glowing spot',
+    hintMouse: 'Drag to turn · scroll to move in or out · click the glowing spot (or move in until you go through)',
     hintTouch: 'Drag to turn · pinch to zoom · tap the glowing spot',
-    hintHands: 'Close your hand to grab and turn · let go to spin · close both hands over the glowing spot and pull apart to open it',
+    hintHands: 'Open hand: move it to turn · bring it closer to the camera to move in, pull back to move out · put the glowing spot in the reticle and move in until you go through',
     hintFind: 'Something glows behind the cube…',
     layer: 'layer',
     names: {

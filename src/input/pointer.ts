@@ -5,7 +5,7 @@
 export interface Intents {
   /** Radians of yaw / pitch. */
   rotate(dYaw: number, dPitch: number): void;
-  /** Multiplies camera distance (<1 = closer). */
+  /** Multiplies camera distance (<1 = closer). Moving in on the aimed target goes through it (dive). */
   zoom(factor: number): void;
   /** Cursor position in NDC (-1..1). Returns whether it is on the target. */
   hover(x: number, y: number): boolean;
@@ -13,8 +13,6 @@ export interface Intents {
   select(x: number, y: number): void;
   /** Dive into the current target wherever it is (keyboard, or a hand gesture already on it). */
   activate(): void;
-  /** Hands: 0..1 of tearing the target open (visual preview before the dive). */
-  pull(amount: number): void;
   /** Let go of a spin: radians/second of yaw and pitch that then decay. */
   fling(vYaw: number, vPitch: number): void;
 }

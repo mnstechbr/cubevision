@@ -8,31 +8,14 @@ export interface HandFrame {
   landmarks: Float32Array;
 }
 
-interface Slot {
-  px: OneEuro;
-  py: OneEuro;
-  closed: boolean;
-  palm: { x: number; y: number } | null;
-  /** Recent rotation speed while grabbing (rad/s), for the throw on release. */
-  vYaw: number;
-  vPitch: number;
-  seen: number;
-}
-
-// Open/closed is read from how far the fingertips reach past their middle joints
-// (from the wrist, in 3D). Open hand ≈ 1.3–1.5, fist ≈ 0.6–0.9. Hysteresis avoids flicker.
-const CLOSE_BELOW = 1.0;
-const OPEN_ABOVE = 1.15;
-const YAW_GAIN = 4.5; // rad per image width of hand travel while grabbing
-const PITCH_GAIN = 2.6;
-const SPREAD = 0.18; // extra distance between fists (image widths) that opens the target
-const TWIST_GAIN = 0.8;
-const LOST_MS = 300; // a hand gone longer than this comes back fresh (no jumps, no throw)
-// The central part of the camera image covers the whole screen: reaching the frame edges
-// is tiring and tracking drops there.
-const REACH = 0.12;
-const reach = (v: number) => Math.min(1, Math.max(0, (v - REACH) / (1 - 2 * REACH)));
-const toNdc = (p: { x: number; y: number }) => ({ x: reach(p.x) * 2 - 1, y: -(reach(p.y) * 2 - 1) });
+const HOLD_MS = 350; // a hand missing for less than this is assumed still there: no flicker, no reset
+const SETTLE_MS = 250; // a hand that just appeared doesn't act yet (raising it isn't a gesture)
+const YAW_GAIN = 5; // rad per image width of palm travel: short movements are enough
+const PITCH_GAIN = 3;
+const DEADZONE = 0.002;
+const ZOOM_POWER = 2.6; // camera distance follows hand size^-2.6: a little closer = a lot closer
+const ZOOM_DEADZONE = 0.004; // relative size change per frame ignored (tracking noise)
+const STILL_ZOOM = 0.012; // above this relative size change per frame, the palm drift isn't a turn
 
 /** Last hand's raw measurements, shown with ?debug to calibrate against a real camera. */
 export const metrics = { text: '' };
@@ -46,128 +29,47 @@ export function handDistance(L: Float32Array, aspect: number): 'close' | 'far' |
   return size > 0.34 ? 'close' : size < 0.08 ? 'far' : null;
 }
 
-/** How far the four fingertips reach past their middle joints (≈1.4 open, <1 fist). */
-export function fingerReach(L: Float32Array) {
-  const d = (i: number) => Math.hypot(L[i * 3] - L[0], L[i * 3 + 1] - L[1], L[i * 3 + 2] - L[2]);
-  let r = 0;
-  for (const [tip, pip] of [[8, 6], [12, 10], [16, 14], [20, 18]]) r += d(tip) / Math.max(d(pip), 1e-4);
-  return r / 4;
+/** Apparent hand size: palm length plus palm width, so turning the hand changes it less. */
+export function handSize(L: Float32Array) {
+  const d = (i: number, j: number) => Math.hypot(L[i * 3] - L[j * 3], L[i * 3 + 1] - L[j * 3 + 1]);
+  return d(0, 9) + d(5, 17);
 }
 
 /**
- * Landmarks → intents, like handling a real hologram. Pure logic, unit-tested.
- * - Open hand: just shows where it is (and lights the target under it).
- * - Close the hand: you grab the world; it turns with your hand. Open: it keeps spinning a little.
- * - Both hands closed: move together to turn, twist to tilt, pull apart to zoom —
- *   or, if you grabbed the glowing spot, pull apart to tear it open and dive.
+ * Landmarks → intents with one open hand, which is what a webcam tracks best.
+ * - Move the palm: the world turns with it, like pushing a globe.
+ * - Bring the hand closer to the camera: you move in. Pull it back: you move out.
+ *   (Moving in on the glowing spot in the reticle goes through it: that's the dive, handled by zoom.)
+ * - Lower the hand: rest. Raising it again picks up from where you are.
+ * Pure logic, unit-tested.
  */
 export class Gestures {
-  private slots = new Map<string, Slot>();
-  private pair: { d0: number; dPrev: number; aPrev: number; mid: { x: number; y: number }; onTarget: boolean } | null = null;
-  private lastT = 0;
+  private px = new OneEuro();
+  private py = new OneEuro();
+  private ps = new OneEuro(1, 0.5);
+  private last: { x: number; y: number; s: number } | null = null;
+  private lastSeen = -Infinity;
+  private appeared = 0;
+  private cursor: Cursor | null = null;
 
   constructor(private intents: Intents) {}
 
   update(hands: HandFrame[], t: number): Cursor[] {
-    const dt = Math.max(1, Math.min(t - this.lastT, 100));
-    this.lastT = t;
-    const keys = new Set<string>();
-    const reads = hands.slice(0, 2).map((h, i) => {
-      // MediaPipe sometimes labels both hands the same; keep their state apart.
-      const key = keys.has(h.label) ? `${h.label}#${i}` : h.label;
-      keys.add(key);
-      return this.read(h, key, t);
-    });
-    for (const [key, s] of this.slots) if (t - s.seen > LOST_MS) this.slots.delete(key);
-
-    const cursors: Cursor[] = reads.map((r) => ({ ...toNdc(r.palm), pinch: r.slot.closed, progress: 0 }));
-    const closed = reads.filter((r) => r.slot.closed);
-
-    if (closed.length === 2) {
-      const [a, b] = closed;
-      const d = Math.hypot(a.palm.x - b.palm.x, a.palm.y - b.palm.y);
-      const ang = Math.atan2(b.palm.y - a.palm.y, b.palm.x - a.palm.x);
-      const mid = { x: (a.palm.x + b.palm.x) / 2, y: (a.palm.y + b.palm.y) / 2 };
-      if (!this.pair) {
-        const m = toNdc(mid);
-        const ca = cursors[reads.indexOf(a)];
-        const cb = cursors[reads.indexOf(b)];
-        const onTarget = this.intents.hover(m.x, m.y) || this.intents.hover(ca.x, ca.y) || this.intents.hover(cb.x, cb.y);
-        this.pair = { d0: d, dPrev: d, aPrev: ang, mid, onTarget };
-      }
-      const p = this.pair;
-      if (p.onTarget) {
-        const amount = Math.max(0, (d - p.d0) / SPREAD);
-        this.intents.pull(Math.min(amount, 1));
-        for (const c of cursors) c.progress = Math.min(amount, 1);
-        if (amount >= 1) {
-          this.intents.activate();
-          p.onTarget = false; // one dive per grab
-          this.intents.pull(0);
-        }
-      } else {
-        if (d > 0.03) this.intents.zoom(Math.min(1.06, Math.max(0.94, p.dPrev / d)));
-        let twist = ang - p.aPrev;
-        if (twist > Math.PI) twist -= Math.PI * 2;
-        if (twist < -Math.PI) twist += Math.PI * 2;
-        this.turn(mid.x - p.mid.x, mid.y - p.mid.y + twist * TWIST_GAIN * 0.4, null, dt);
-      }
-      p.dPrev = d;
-      p.aPrev = ang;
-      p.mid = mid;
-      return cursors;
+    if (hands.length === 0) {
+      if (this.cursor && t - this.lastSeen < HOLD_MS) return [this.cursor];
+      this.cursor = null;
+      metrics.text = 'no hand';
+      return [];
     }
-    if (this.pair) {
-      if (this.pair.onTarget) this.intents.pull(0);
-      this.pair = null;
+    const L = hands[0].landmarks;
+    if (t - this.lastSeen > HOLD_MS) {
+      this.px.reset();
+      this.py.reset();
+      this.ps.reset();
+      this.last = null;
+      this.appeared = t;
     }
-
-    if (closed.length === 1) {
-      const r = closed[0];
-      if (r.prev) this.turn(r.palm.x - r.prev.x, r.palm.y - r.prev.y, r.slot, dt);
-    }
-    for (const r of reads) {
-      if (!r.slot.closed && r.released && r.slot.palm) {
-        // Let go: the world keeps the spin you gave it.
-        this.intents.fling(r.slot.vYaw, r.slot.vPitch);
-        r.slot.vYaw = r.slot.vPitch = 0;
-      }
-    }
-    // An open hand points: light up the target under it.
-    const pointer = reads.find((r) => !r.slot.closed);
-    if (pointer) {
-      const c = toNdc(pointer.palm);
-      this.intents.hover(c.x, c.y);
-    }
-    return cursors;
-  }
-
-  private turn(dx: number, dy: number, slot: Slot | null, dt: number) {
-    if (Math.abs(dx) + Math.abs(dy) < 0.0008) {
-      if (slot) {
-        slot.vYaw *= 0.8;
-        slot.vPitch *= 0.8;
-      }
-      return;
-    }
-    const yaw = dx * YAW_GAIN;
-    const pitch = dy * PITCH_GAIN;
-    this.intents.rotate(yaw, pitch);
-    if (slot) {
-      // Smoothed speed so the throw follows the last part of the movement.
-      slot.vYaw += ((yaw * 1000) / dt - slot.vYaw) * 0.4;
-      slot.vPitch += ((pitch * 1000) / dt - slot.vPitch) * 0.4;
-    }
-  }
-
-  private read(h: HandFrame, key: string, t: number) {
-    const L = h.landmarks;
-    let slot = this.slots.get(key);
-    if (!slot || t - slot.seen > LOST_MS) {
-      slot = { px: new OneEuro(), py: new OneEuro(), closed: false, palm: null, vYaw: 0, vPitch: 0, seen: t };
-      this.slots.set(key, slot);
-    }
-    slot.seen = t;
+    this.lastSeen = t;
 
     let x = 0;
     let y = 0;
@@ -175,15 +77,25 @@ export class Gestures {
       x += 1 - L[i * 3]; // mirror: the screen acts like a mirror
       y += L[i * 3 + 1];
     }
-    const palm = { x: slot.px.filter(x / 5, t), y: slot.py.filter(y / 5, t) };
+    const now = { x: this.px.filter(x / 5, t), y: this.py.filter(y / 5, t), s: this.ps.filter(handSize(L), t) };
 
-    const fr = fingerReach(L);
-    const was = slot.closed;
-    slot.closed = was ? fr < OPEN_ABOVE : fr < CLOSE_BELOW;
-    const released = was && !slot.closed;
-    const prev = slot.palm;
-    slot.palm = palm;
-    metrics.text = `hands ${this.slots.size} · reach ${fr.toFixed(2)} (fist <${CLOSE_BELOW}, open >${OPEN_ABOVE}) · ${slot.closed ? 'GRAB' : 'open'}`;
-    return { slot, palm, prev, released };
+    let change = 0;
+    if (this.last && t - this.appeared > SETTLE_MS) {
+      change = now.s / this.last.s - 1;
+      if (Math.abs(change) > ZOOM_DEADZONE) {
+        this.intents.zoom(Math.min(1.08, Math.max(0.92, Math.pow(this.last.s / now.s, ZOOM_POWER))));
+      }
+      // While the hand moves toward or away from the camera, its drift isn't meant as a turn.
+      const dx = now.x - this.last.x;
+      const dy = now.y - this.last.y;
+      if (Math.abs(change) < STILL_ZOOM && Math.abs(dx) + Math.abs(dy) > DEADZONE) {
+        this.intents.rotate(dx * YAW_GAIN, dy * PITCH_GAIN);
+      }
+    }
+    this.last = now;
+
+    metrics.text = `palm ${now.x.toFixed(2)},${now.y.toFixed(2)} · size ${now.s.toFixed(3)} · ${change > ZOOM_DEADZONE ? 'IN' : change < -ZOOM_DEADZONE ? 'OUT' : 'steady'}`;
+    this.cursor = { x: now.x * 2 - 1, y: -(now.y * 2 - 1), pinch: false, progress: 0 };
+    return [this.cursor];
   }
 }

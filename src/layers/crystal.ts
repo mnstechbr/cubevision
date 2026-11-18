@@ -13,7 +13,7 @@ import {
 } from 'three/webgpu';
 import { color, cos, float, fract, hash, instanceIndex, instancedBufferAttribute, length, mix, pow, sin, smoothstep, time, uv, vec3, vec4 } from 'three/tsl';
 import { Lines, layerBase, rng } from '../engine/build';
-import { AMBER, CYAN, ICE, fillMaterial, lineMaterial, strokes, targetMaterial, type Fade } from '../engine/holo';
+import { AMBER, CYAN, ICE, fillMaterial, lineMaterial, strokes, targetMaterial, type Fade, horizon } from '../engine/holo';
 import type { Layer, LayerContext } from '../engine/layers';
 
 const TAU = Math.PI * 2;
@@ -461,6 +461,7 @@ export function create(ctx: LayerContext): Layer {
     { object: mk(satTip), pt: 'CRISTAL SATÉLITE · SiO₂', en: 'SATELLITE CRYSTAL · SiO₂' },
   ];
 
+  root.add(horizon(fade, 6));
   return {
     id: 'crystal',
     exposure: 0.42,
@@ -468,7 +469,7 @@ export function create(ctx: LayerContext): Layer {
     fade,
     glow,
     radius: 6,
-    view: { distance: 13, minDistance: 5, maxDistance: 19, pitch: 0.16, height: 3.0 },
+    view: { distance: 8.5, minDistance: 3.5, maxDistance: 17, pitch: 0.06, height: 2.6 },
     target: { object: spark, radius: 0.4 },
     labels,
     update(t) {

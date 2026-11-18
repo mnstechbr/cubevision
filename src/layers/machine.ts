@@ -17,7 +17,7 @@ import {
 } from 'three/webgpu';
 import { color, float, instancedBufferAttribute, length, sin, smoothstep, time, uv } from 'three/tsl';
 import { Lines, layerBase, rng } from '../engine/build';
-import { AMBER, CYAN, ICE, edges, fillMaterial, lineMaterial, strokes, targetMaterial, type Fade } from '../engine/holo';
+import { AMBER, CYAN, ICE, edges, fillMaterial, lineMaterial, strokes, targetMaterial, type Fade, horizon } from '../engine/holo';
 import type { Layer, LayerContext } from '../engine/layers';
 
 const TAU = Math.PI * 2;
@@ -592,6 +592,7 @@ export function create(ctx: LayerContext): Layer {
     { object: plateAnchor, pt: 'PLACA EXTERNA · DESACOPLADA', en: 'OUTER PLATE · DECOUPLED' },
   ];
 
+  root.add(horizon(fade, 8));
   return {
     id: 'machine',
     exposure: 0.85,
@@ -599,7 +600,7 @@ export function create(ctx: LayerContext): Layer {
     fade,
     glow,
     radius: 8,
-    view: { distance: 15, minDistance: 6, maxDistance: 22, pitch: 0.22, height: 3.2 },
+    view: { distance: 10, minDistance: 4.5, maxDistance: 20, pitch: -0.04, height: 3.4 },
     target: { object: crystal, radius: 0.7 },
     labels,
     update(t) {

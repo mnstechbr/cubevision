@@ -352,6 +352,54 @@ a:focus-visible {
   }
 }
 
+#reticle {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 50%;
+  border: 1px solid rgb(63 232 255 / 0.5);
+  pointer-events: none;
+  z-index: 7;
+  opacity: 0;
+  transition:
+    opacity 0.3s,
+    border-color 0.2s,
+    transform 0.2s;
+}
+#reticle.on {
+  opacity: 1;
+}
+/* crosshair ticks */
+#reticle::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  background:
+    linear-gradient(var(--cyan), var(--cyan)) 50% 0 / 1px 8px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) 50% 100% / 1px 8px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) 0 50% / 8px 1px no-repeat,
+    linear-gradient(var(--cyan), var(--cyan)) 100% 50% / 8px 1px no-repeat;
+  opacity: 0.7;
+}
+/* fills as you close in on the aimed spot */
+#reticle::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  background: conic-gradient(rgb(255 166 61 / 0.8) calc(var(--p, 0) * 1turn), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%);
+  mask: radial-gradient(circle, transparent 62%, #000 64%);
+}
+#reticle.aimed {
+  border-color: var(--amber);
+  transform: scale(1.12);
+  box-shadow: 0 0 22px rgb(255 166 61 / 0.45);
+}
+
 #cursors i {
   position: fixed;
   left: 0;

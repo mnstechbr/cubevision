@@ -43,8 +43,7 @@ import {
   fillMaterial,
   lineMaterial,
   strokes,
-  targetMaterial,
-} from "../engine/holo";
+  targetMaterial, horizon } from "../engine/holo";
 import type { Layer, LayerContext } from "../engine/layers";
 
 const R = 11;
@@ -991,6 +990,7 @@ export function create(ctx: LayerContext): Layer {
   pin("twin", "PONTE AÉREA · FLUXO 1,2K/MIN", "SKYBRIDGE · FLOW 1.2K/MIN");
 
   const sweepSpeed = ctx.reducedMotion ? 0.05 : 0.45;
+  root.add(horizon(fade, R));
   return {
     id: "city",
     exposure: 0.5,
@@ -998,13 +998,7 @@ export function create(ctx: LayerContext): Layer {
     fade,
     glow,
     radius: R,
-    view: {
-      distance: 18,
-      minDistance: 6,
-      maxDistance: 27,
-      pitch: 0.55,
-      height: 0.9,
-    },
+    view: { distance: 10, minDistance: 4, maxDistance: 24, pitch: 0.2, height: 1.6 },
     target: { object: door, radius: 1.1 },
     labels,
     update(_t, dt) {

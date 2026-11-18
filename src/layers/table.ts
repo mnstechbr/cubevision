@@ -1,6 +1,6 @@
 import { BoxGeometry, CircleGeometry, CylinderGeometry, Group, LineSegments, Mesh, Object3D, Vector3 } from 'three/webgpu';
 import { Lines, layerBase, rng } from '../engine/build';
-import { CYAN, ICE, fillMaterial, lineMaterial, strokes, targetMaterial } from '../engine/holo';
+import { CYAN, ICE, fillMaterial, lineMaterial, strokes, targetMaterial, horizon } from '../engine/holo';
 import type { LayerContext, Layer } from '../engine/layers';
 
 const CUBE = 0.65; // half size
@@ -226,6 +226,7 @@ export function create(ctx: LayerContext): Layer {
   ];
 
   const floating = new Vector3();
+  root.add(horizon(fade, 9));
   return {
     id: 'table',
     root,
@@ -233,7 +234,7 @@ export function create(ctx: LayerContext): Layer {
     glow,
     labels,
     radius: 9,
-    view: { distance: 7.5, minDistance: 3.2, maxDistance: 14, pitch: 0.3, height: 2 },
+    view: { distance: 5.2, minDistance: 2.6, maxDistance: 12, pitch: 0.12, height: 2.4 },
     target: { object: slit, radius: 0.5, facing: new Vector3(0, 0, -1) },
     update(t) {
       floating.set(0, CUBE_Y + Math.sin(t * 0.9) * 0.06, 0);

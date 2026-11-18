@@ -32,8 +32,7 @@ import {
   fillMaterial,
   lineMaterial,
   strokes,
-  targetMaterial,
-} from "../engine/holo";
+  targetMaterial, horizon } from "../engine/holo";
 import type { Layer, LayerContext } from "../engine/layers";
 
 const W = 5; // half width (x)
@@ -909,6 +908,7 @@ export function create(ctx: LayerContext): Layer {
   pin(-4.2, 2.4, D - 0.5, "SERVIDOR · CARGA 62%", "SERVER · LOAD 62%");
   pin(W, 2.4, 1.6, "PORTA · ACESSO RESTRITO", "DOOR · RESTRICTED ACCESS");
 
+  root.add(horizon(fade, 6.5));
   return {
     id: "room",
     exposure: 0.5,
@@ -916,13 +916,7 @@ export function create(ctx: LayerContext): Layer {
     fade,
     glow,
     radius: 6.5,
-    view: {
-      distance: 11.5,
-      minDistance: 3,
-      maxDistance: 15,
-      pitch: 0.42,
-      height: 1.2,
-    },
+    view: { distance: 3.6, minDistance: 1.4, maxDistance: 5, pitch: 0.1, height: 1.6 },
     target: { object: holoMachine, radius: 0.55 },
     labels,
     update(t) {

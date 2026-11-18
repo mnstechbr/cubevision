@@ -11,7 +11,7 @@ import { createGovernor, createStage } from './engine/stage';
 import { textPoints } from './engine/text';
 import { Vector3 } from 'three/webgpu';
 import { i18n } from './i18n';
-import type { HandsSession } from './input/hands';
+import { tracker as trackerInfo, type HandsSession } from './input/hands';
 import { metrics as handMetrics } from './input/gestures';
 import { attachPointer, type Intents } from './input/pointer';
 import { ui } from './ui';
@@ -115,9 +115,10 @@ async function boot() {
 
   let hovered = false;
   let hands: HandsSession | null = null;
+  const AIM = 0.3; // how close to the reticle the spot must be (screen-height units)
   const intents: Intents = {
     rotate: (a, b) => orbit.rotate(a, b),
-    zoom: (f) => orbit.zoom(f),
+    zoom: (f) => dive.zoom(f, AIM),
     hover(x, y) {
       hovered = !dive.busy && dive.hits(x, y);
       canvas.classList.toggle('on-target', hovered);
@@ -127,7 +128,6 @@ async function boot() {
       if (!dive.busy && dive.hits(x, y)) dive.start();
     },
     activate: () => dive.start(),
-    pull: (a) => dive.preview(a),
     fling: (y, p) => orbit.fling(y, p),
   };
 
@@ -148,6 +148,7 @@ async function boot() {
 
   // Frame loop. Allocation-free; pauses with the tab.
   const fpsEl = ui.$('#fps');
+  const reticle = ui.$('#reticle');
   fpsEl.hidden = !debug;
   let last = performance.now();
   let fpsAcc = 0;
@@ -174,10 +175,18 @@ async function boot() {
     // Exposure follows whichever world fills the screen (the incoming one once it takes over).
     const lit = dive.state === 'reform' && pr > 0.5 && next ? (next.exposure ?? 1) : (cur.exposure ?? 1);
     stage.exposure.value += (lit - stage.exposure.value) * Math.min(1, dt * 2.5);
+    holo.fogNear.value = orbit.now.distance * 1.2;
+    holo.fogFar.value = orbit.now.distance * 3.6;
     // A band of brighter light sweeps up through the world every few seconds.
     holo.sweepY.value = orbit.now.target.y - cur.radius * 0.6 + ((t * 0.35) % 3) * cur.radius * 0.6;
     holo.sweepWidth.value = cur.radius * 0.04;
     updateCallouts(cur, camera, started && dive.state === 'idle' && cur.fade.value > 0.95);
+    if (hands) {
+      const aimed = dive.state === 'idle' && dive.hits(0, 0, AIM);
+      reticle.classList.toggle('aimed', aimed);
+      const span = Math.max(1e-3, cur.view.distance - orbit.minDistance);
+      reticle.style.setProperty('--p', aimed ? Math.min(1, Math.max(0, (cur.view.distance - orbit.goal.distance) / span)).toFixed(3) : '0');
+    }
     if (dive.state === 'idle') cur.glow.value += ((hovered ? 0.75 : 0) - cur.glow.value) * Math.min(1, dt * 6);
     cur.update(t, dt);
     if (next && next.root.parent) next.update(t, dt);
@@ -192,7 +201,7 @@ async function boot() {
       fpsFrames++;
       if (fpsAcc > 0.5) {
         const info = renderer.info.render;
-        fpsEl.textContent = `${Math.round(fpsFrames / fpsAcc)} fps · q${governor.level} · ${info.drawCalls} draws · ${cur.id} · ${dive.state}${hands ? `\n${handMetrics.text}` : ''}`;
+        fpsEl.textContent = `${Math.round(fpsFrames / fpsAcc)} fps · q${governor.level} · ${info.drawCalls} draws · ${cur.id} · ${dive.state}${hands ? `\n${trackerInfo.text}\n${handMetrics.text}` : ''}`;
         fpsAcc = 0;
         fpsFrames = 0;
       }
@@ -259,6 +268,7 @@ async function boot() {
       ui.hint('hintHands', 0); // stays until the first dive
       camToggle.hidden = false;
       setCamLabel(true);
+      reticle.classList.add('on');
       if (params.has('gravar')) addRecordButton();
     } catch (e) {
       console.warn('hands unavailable', e);
@@ -293,6 +303,7 @@ async function boot() {
     if (hands) {
       hands.stop();
       hands = null;
+      reticle.classList.remove('on');
       ui.cursors([]);
       setCamLabel(false);
       pointerHint();
