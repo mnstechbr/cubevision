@@ -21,15 +21,20 @@ interface Slot {
 
 const PINCH_IN = 0.32; // thumb–index gap / hand size
 const PINCH_OUT = 0.5; // hysteresis: harder to leave than to enter
-const HOLD_DELAY = 300; // ms before a held pinch starts counting as "open it"
-const HOLD_TIME = 1500; // ms of held pinch to dive with one hand
+const HOLD_DELAY = 150; // ms before a held pinch starts counting as "open it"
+const HOLD_TIME = 900; // ms of held pinch to dive with one hand
 const SPREAD = 0.22; // extra palm distance (image widths) for the two-hand dive
 const YAW_GAIN = 4;
 const PITCH_GAIN = 2.4;
+// The central part of the camera image covers the whole screen: reaching the edges
+// of the frame is tiring and tracking drops there.
+const REACH = 0.15;
+const reach = (v: number) => Math.min(1, Math.max(0, (v - REACH) / (1 - 2 * REACH)));
 
 /**
  * Landmarks → intents. Pure logic (no DOM, no camera), so it is unit-tested.
- * One hand: open palm turns, pinch grabs/arms, held pinch on an armed target dives.
+ * One hand: the hand only points (so aiming never moves the world); pinch on the target
+ * and hold to dive; pinch elsewhere and drag to turn the world.
  * Two hands: spreading zooms, or dives when the target is armed.
  */
 export class Gestures {
@@ -79,8 +84,8 @@ export class Gestures {
       if (slot.pinching && this.armed()) {
         progress = Math.max(0, (t - slot.pinchAt - HOLD_DELAY) / HOLD_TIME);
         this.intents.expand(progress);
-      } else if (slot.lastPalm && (slot.pinching || reads[0].open)) {
-        // Open hand or a grab (pinch off-target) turns the world.
+      } else if (slot.lastPalm && slot.pinching) {
+        // A grab (pinch off-target) turns the world.
         const dx = palm.x - slot.lastPalm.x;
         const dy = palm.y - slot.lastPalm.y;
         if (Math.abs(dx) + Math.abs(dy) > 0.0015) this.intents.rotate(dx * YAW_GAIN, dy * PITCH_GAIN);
@@ -111,16 +116,12 @@ export class Gestures {
     const pinchStarted = slot.pinching && !wasPinching;
     if (pinchStarted) slot.pinchAt = t;
 
-    let extended = 0;
-    for (const [tip, pip] of [[8, 6], [12, 10], [16, 14], [20, 18]]) if (dist(tip, 0) > dist(pip, 0) * 1.15) extended++;
-    const open = extended >= 3 && !slot.pinching;
-
-    const cx = slot.cx.filter((X(4) + X(8)) / 2, t);
-    const cy = slot.cy.filter((Y(4) + Y(8)) / 2, t);
+    const cx = reach(slot.cx.filter((X(4) + X(8)) / 2, t));
+    const cy = reach(slot.cy.filter((Y(4) + Y(8)) / 2, t));
     const palm = {
       x: slot.px.filter((X(0) + X(5) + X(9) + X(13) + X(17)) / 5, t),
       y: slot.py.filter((Y(0) + Y(5) + Y(9) + Y(13) + Y(17)) / 5, t),
     };
-    return { slot, open, pinchStarted, palm, cursor: { x: cx * 2 - 1, y: -(cy * 2 - 1) } };
+    return { slot, pinchStarted, palm, cursor: { x: cx * 2 - 1, y: -(cy * 2 - 1) } };
   }
 }

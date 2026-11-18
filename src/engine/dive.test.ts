@@ -72,3 +72,20 @@ describe('dive through the whole loop', () => {
     expect(visited).toEqual([...ORDER, ORDER[0]]);
   });
 });
+
+describe('target hit test', () => {
+  it('forgives a cursor near the target and rejects one far from it', async () => {
+    const camera = new PerspectiveCamera(50, 16 / 9, 0.1, 1000);
+    const orbit = new Orbit(camera, false);
+    const city = await loadLayer('city', ctx);
+    orbit.apply(city.view, true);
+    orbit.update(1 / 60);
+    const host = { scene: new Scene(), camera, orbit, particles: new Particles(10), current: city, reducedMotion: false, next: () => null, arrived() {} };
+    const dive = new Dive(host);
+    camera.updateMatrixWorld();
+    const c = city.target.object.getWorldPosition(new Vector3()).project(camera);
+    expect(dive.hits(c.x, c.y)).toBe(true);
+    expect(dive.hits(c.x + 0.05, c.y - 0.04)).toBe(true);
+    expect(dive.hits(c.x + 0.6, c.y)).toBe(false);
+  });
+});

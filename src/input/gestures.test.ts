@@ -31,11 +31,19 @@ function setup(armed = false) {
 }
 
 describe('Gestures', () => {
-  it('turns the world when an open hand moves', () => {
+  it('an open hand only points: aiming never turns the world', () => {
     const { g, intents } = setup();
     for (let i = 0; i < 10; i++) g.update([hand('Right', 0.3 + i * 0.03, 0.5)], i * 33);
-    expect(intents.rotate).toHaveBeenCalled();
+    expect(intents.hover).toHaveBeenCalled();
+    expect(intents.rotate).not.toHaveBeenCalled();
     expect(intents.select).not.toHaveBeenCalled();
+  });
+
+  it('pinch and drag off-target turns the world', () => {
+    const { g, intents } = setup();
+    g.update([hand('Right', 0.3, 0.5)], 0);
+    for (let i = 1; i < 10; i++) g.update([hand('Right', 0.3 + i * 0.03, 0.5, true)], i * 33);
+    expect(intents.rotate).toHaveBeenCalled();
   });
 
   it('a pinch asks to arm the target under the cursor, once', () => {

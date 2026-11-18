@@ -1,4 +1,4 @@
-import { MathUtils, Quaternion, Raycaster, Sphere, Vector2, Vector3, type PerspectiveCamera, type Scene } from 'three/webgpu';
+import { MathUtils, Quaternion, Vector3, type PerspectiveCamera, type Scene } from 'three/webgpu';
 import { disposeTree, type Layer } from './layers';
 import type { Orbit } from './orbit';
 import type { Particles } from './particles';
@@ -37,9 +37,8 @@ export class Dive {
   private incoming: Layer | null = null;
   private baseScale = 1;
   private sinceExpand = 0;
-  private ray = new Raycaster();
-  private sphere = new Sphere();
-  private ndc = new Vector2();
+  private center2 = new Vector3();
+  private edge = new Vector3();
   private quat = new Quaternion();
   private normal = new Vector3();
   private toCam = new Vector3();
@@ -56,18 +55,28 @@ export class Dive {
     return this.state !== 'idle' && this.state !== 'armed';
   }
 
-  /** NDC hit test against the current target. */
+  /**
+   * Is the cursor (NDC) on the current target? Measured on screen, with a minimum size,
+   * so a small or far target is still easy to hit with a shaky hand.
+   */
   hits(x: number, y: number) {
-    const target = this.host.current.target;
-    target.object.getWorldPosition(this.sphere.center);
-    this.sphere.radius = target.radius * 1.6;
+    const { camera, current } = this.host;
+    const target = current.target;
+    camera.updateMatrixWorld();
+    target.object.getWorldPosition(this.center2);
     if (target.facing) {
       target.object.getWorldQuaternion(this.quat);
       this.normal.copy(target.facing).applyQuaternion(this.quat);
-      if (this.normal.dot(this.toCam.subVectors(this.host.camera.position, this.sphere.center)) <= 0) return false;
+      if (this.normal.dot(this.toCam.subVectors(camera.position, this.center2)) <= 0) return false;
     }
-    this.ray.setFromCamera(this.ndc.set(x, y), this.host.camera);
-    return this.ray.ray.intersectsSphere(this.sphere);
+    // Screen radius: project a point one target-radius to the side of its center.
+    this.edge.setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(target.radius).add(this.center2).project(camera);
+    this.center2.project(camera);
+    if (this.center2.z > 1) return false; // behind the camera
+    const a = camera.aspect;
+    const radius = Math.hypot((this.edge.x - this.center2.x) * a, this.edge.y - this.center2.y);
+    const reach = Math.max(radius * 1.6, 0.1);
+    return Math.hypot((x - this.center2.x) * a, y - this.center2.y) < reach;
   }
 
   /** Hands: pinch on the target focuses it and waits for the spread gesture. */

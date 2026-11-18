@@ -17,9 +17,8 @@ const dict = {
     camDenied: 'Câmera indisponível. Seguindo com o mouse.',
     hintMouse: 'Arraste para girar · role para aproximar · clique no ponto que brilha',
     hintTouch: 'Arraste para girar · pinça para aproximar · toque no ponto que brilha',
-    hintHands: 'Mão aberta gira · pinça no alvo · afaste as duas mãos (ou segure a pinça) para mergulhar',
+    hintHands: 'A mão aponta · pinça e arraste para girar · pinça no ponto que brilha e segure para mergulhar',
     hintFind: 'Algo brilha atrás do cubo…',
-    armed: 'Afaste as mãos para abrir',
     layer: 'camada',
     names: {
       table: 'oficina',
@@ -51,9 +50,8 @@ const dict = {
     camDenied: 'Camera unavailable. Continuing with the mouse.',
     hintMouse: 'Drag to turn · scroll to zoom · click the glowing spot',
     hintTouch: 'Drag to turn · pinch to zoom · tap the glowing spot',
-    hintHands: 'Open hand turns · pinch the target · spread both hands (or hold the pinch) to dive',
+    hintHands: 'Your hand points · pinch and drag to turn · pinch the glowing spot and hold to dive',
     hintFind: 'Something glows behind the cube…',
-    armed: 'Spread your hands to open it',
     layer: 'layer',
     names: {
       table: 'workshop',
