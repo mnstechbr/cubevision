@@ -16,13 +16,16 @@ const CLOSE_BELOW = 1.0;
 const OPEN_ABOVE = 1.1;
 const SLACK = 0.04; // the hand must move this far (image widths) before the world follows: kills jitter
 const YAW_GAIN = 4; // rad per image width of fist travel
-const ZOOM_GAIN = 3; // log-distance per image height of fist travel (up = in)
+const PITCH_GAIN = 2.4;
+const ZOOM_GAIN = 4.5; // log-distance per image height of open-hand travel (up = in)
 const HOLD_MS = 500; // a hand missing for less than this keeps its state: tracking gaps don't drop the grab
 const REACQUIRE_MS = 120; // after a gap this long the tracker's first position can jump: start over from it
 const SETTLE_MS = 200; // a hand that just appeared doesn't act yet
 
 /** Last hand's raw measurements, shown with ?debug to calibrate against a real camera. */
 export const metrics = { text: '' };
+/** For the on-screen zoom indicator: last zoom direction (1 in, -1 out) and when (tracker ms). */
+export const zooming = { dir: 0, at: -Infinity };
 
 /**
  * Is the hand at a comfortable distance? Wrist → middle knuckle, in image heights:
@@ -43,10 +46,10 @@ export function fingerReach(L: Float32Array) {
 
 /**
  * Landmarks → intents, one hand:
- * - open hand: rest (just a cursor), nothing moves;
- * - close it to grab: drag sideways to turn the world, drag up to move in, down to move out;
+ * - closed hand (grab) + drag, any direction: moves the map (turns the world with the hand);
+ * - open hand moved up: move in; moved down: move out (sideways does nothing);
  *   moving in on the glowing spot in the reticle goes through it (the dive, handled by zoom);
- * - open it to let go.
+ * - lower the hand out of view to rest.
  * The world only follows movement beyond a small slack around the hand, which removes the
  * webcam's jitter without hiding deliberate motion. Pure logic, unit-tested (also on a real recording).
  */
@@ -94,10 +97,10 @@ export class Gestures {
     const reach = fingerReach(L);
     const was = this.closed;
     this.closed = was ? reach < OPEN_ABOVE : reach < CLOSE_BELOW;
-    if ((this.closed && !was) || (this.closed && gap > REACQUIRE_MS)) this.anchor = { ...palm }; // grab (or re-found): start from here
-    if (!this.closed) this.anchor = null;
+    // Each pose has its own starting point: switching pose (or the hand being re-found) starts over.
+    if (this.closed !== was || gap > REACQUIRE_MS || !this.anchor) this.anchor = { ...palm };
 
-    if (this.closed && this.anchor && t - this.appeared > SETTLE_MS) {
+    if (t - this.appeared > SETTLE_MS) {
       // Rubber band: the anchor trails the hand by SLACK; only that trailing motion counts.
       const ox = palm.x - this.anchor.x;
       const oy = palm.y - this.anchor.y;
@@ -108,12 +111,18 @@ export class Gestures {
         const my = oy * k;
         this.anchor.x += mx;
         this.anchor.y += my;
-        if (Math.abs(mx) > Math.abs(my) * 0.5) this.intents.rotate(mx * YAW_GAIN, 0);
-        if (Math.abs(my) > Math.abs(mx) * 0.5) this.intents.zoom(Math.exp(my * ZOOM_GAIN)); // up (y↓) = in
+        if (this.closed) {
+          this.intents.rotate(mx * YAW_GAIN, my * PITCH_GAIN); // grab: the map follows the hand
+        } else if (Math.abs(my) > Math.abs(mx)) {
+          const f = Math.exp(my * ZOOM_GAIN); // open hand up (y↓) = in, down = out
+          this.intents.zoom(f);
+          zooming.dir = f < 1 ? 1 : -1;
+          zooming.at = t;
+        }
       }
     }
 
-    metrics.text = `reach ${reach.toFixed(2)} (fist <${CLOSE_BELOW}) · ${this.closed ? 'GRAB' : 'open'} · palm ${palm.x.toFixed(2)},${palm.y.toFixed(2)}`;
+    metrics.text = `reach ${reach.toFixed(2)} (fist <${CLOSE_BELOW}) · ${this.closed ? 'GRAB (move)' : 'OPEN (zoom)'} · palm ${palm.x.toFixed(2)},${palm.y.toFixed(2)}`;
     this.cursor = { x: palm.x * 2 - 1, y: -(palm.y * 2 - 1), pinch: this.closed, progress: 0 };
     return [this.cursor];
   }

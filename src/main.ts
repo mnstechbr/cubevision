@@ -12,7 +12,7 @@ import { textPoints } from './engine/text';
 import { Vector3 } from 'three/webgpu';
 import { i18n } from './i18n';
 import { tracker as trackerInfo, type HandsSession } from './input/hands';
-import { metrics as handMetrics } from './input/gestures';
+import { metrics as handMetrics, zooming } from './input/gestures';
 import { attachPointer, type Intents } from './input/pointer';
 import { ui } from './ui';
 
@@ -150,6 +150,7 @@ async function boot() {
   const fpsEl = ui.$('#fps');
   const reticle = ui.$('#reticle');
   const guide = ui.$('#hand-guide');
+  const zoomInd = ui.$('#zoom-ind');
   fpsEl.hidden = !debug;
   let last = performance.now();
   let fpsAcc = 0;
@@ -183,6 +184,11 @@ async function boot() {
     holo.sweepWidth.value = cur.radius * 0.04;
     updateCallouts(cur, camera, started && dive.state === 'idle' && cur.fade.value > 0.95);
     if (hands) {
+      // Say out loud what the hand is doing to the camera.
+      const recent = performance.now() - zooming.at < 400 && dive.state === 'idle';
+      const atLimit = recent && zooming.dir > 0 && orbit.goal.distance <= orbit.minDistance * 1.02;
+      zoomInd.classList.toggle('on', recent);
+      if (recent) zoomInd.textContent = atLimit ? i18n.t.zoomLimit : zooming.dir > 0 ? i18n.t.zoomIn : i18n.t.zoomOut;
       const aimed = dive.state === 'idle' && dive.hits(0, 0, AIM);
       reticle.classList.toggle('aimed', aimed);
       const span = Math.max(1e-3, cur.view.distance - orbit.minDistance);

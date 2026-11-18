@@ -41,8 +41,8 @@ describe('replay of a real webcam recording', () => {
   const sum = (kind: 'rotate' | 'zoom', a: number, b: number) =>
     calls.filter((c) => c.kind === kind && c.t >= a && c.t < b).reduce((s, c) => s + Math.abs(c.v), 0);
 
-  it('a clearly open hand never moves the world', () => {
-    expect(calls.filter((c) => c.open)).toHaveLength(0);
+  it('a clearly open hand never turns the map (it only zooms)', () => {
+    expect(calls.filter((c) => c.open && c.kind === 'rotate')).toHaveLength(0);
   });
 
   it('the jump when tracking finds the hand again is not taken as movement', () => {

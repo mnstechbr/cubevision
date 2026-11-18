@@ -52,10 +52,10 @@ Fluxo: **câmera → MediaPipe (21 pontos por mão) → filtro de suavização �
 
 | Gesto (uma mão) | Ação |
 |---|---|
-| Mão aberta | Solta: nada se mexe |
-| Mão fechada + arrastar para os lados | Gira |
-| Mão fechada + arrastar para cima / para baixo | Aproxima / afasta |
+| Mão **fechada** + arrastar para qualquer lado | Move o mapa (o mundo segue a mão) |
+| Mão **aberta** subindo / descendo | Aproxima / afasta (zoom) |
 | Ponto que brilha na mira do centro + aproximar | Entra nele (o mergulho) |
+| Abaixar a mão | Descansa |
 
 Um painel no canto da tela mostra esses controles e acende, ao vivo, o estado da mão (aberta/fechada). Calibrado com uma gravação real (`test/fixtures/cubevision-maos.json`, reproduzida em `src/input/replay.test.ts`): aberta × fechada é bimodal e limpa; a palma treme ~1,3% da imagem por quadro (filtrado por uma "folga" de 4%); o tamanho da mão treme ±5% (inútil para zoom); ao reencontrar a mão o rastreador pode pular até 30% (ignorado).
 

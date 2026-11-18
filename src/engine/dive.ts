@@ -86,8 +86,11 @@ export class Dive {
     if (this.busy) return;
     const { orbit, current } = this.host;
     if (f < 1 && this.hits(0, 0, aim)) {
-      current.target.object.getWorldPosition(this.center);
-      orbit.goal.target.lerp(this.center, Math.min(1, (1 - f) * 3));
+      // Only the last stretch heads for the target, so moving in reads as a zoom, not a slide.
+      if (orbit.goal.distance < orbit.minDistance * 1.8) {
+        current.target.object.getWorldPosition(this.center);
+        orbit.goal.target.lerp(this.center, Math.min(1, (1 - f) * 3));
+      }
       if (orbit.goal.distance <= orbit.minDistance * 1.02) return this.start();
     } else if (f > 1) {
       this.center.set(0, current.view.height, 0);

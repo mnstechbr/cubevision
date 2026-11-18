@@ -39,39 +39,47 @@ describe('Gestures (grab with one hand)', () => {
     expect(fingerReach(hand(0.5, 0.5, true).landmarks)).toBeLessThan(0.9);
   });
 
-  it('an open hand never moves the world, however it moves', () => {
-    const { g, intents } = setup();
-    run(g, (i) => [hand(0.2 + i * 0.03, 0.3 + i * 0.02)], 20);
-    expect(intents.rotate).not.toHaveBeenCalled();
-    expect(intents.zoom).not.toHaveBeenCalled();
-  });
-
-  it('a fist dragged sideways turns the world', () => {
-    const { g, intents } = setup();
-    run(g, (i) => [hand(0.7 - i * 0.02, 0.5, true)], 20); // to the right on the (mirrored) screen
-    const yaws = vi.mocked(intents.rotate).mock.calls.map((c) => c[0]);
+  it('a fist dragged in any direction moves the map, and never zooms', () => {
+    const side = setup();
+    run(side.g, (i) => [hand(0.7 - i * 0.02, 0.5, true)], 20); // to the right on the (mirrored) screen
+    const yaws = vi.mocked(side.intents.rotate).mock.calls.map((c) => c[0]);
     expect(yaws.length).toBeGreaterThan(5);
     expect(yaws.every((y) => y > 0)).toBe(true);
-    expect(intents.zoom).not.toHaveBeenCalled();
-  });
 
-  it('a fist dragged up moves in, down moves out', () => {
     const up = setup();
     run(up.g, (i) => [hand(0.5, 0.7 - i * 0.02, true)], 20);
+    const pitches = vi.mocked(up.intents.rotate).mock.calls.map((c) => c[1]);
+    expect(pitches.length).toBeGreaterThan(5);
+    expect(pitches.every((p) => p < 0)).toBe(true); // up: like dragging the map up
+    expect(side.intents.zoom).not.toHaveBeenCalled();
+    expect(up.intents.zoom).not.toHaveBeenCalled();
+  });
+
+  it('an open hand moved up moves in, down moves out, and never turns the map', () => {
+    const up = setup();
+    run(up.g, (i) => [hand(0.5, 0.7 - i * 0.02)], 20);
     const inF = vi.mocked(up.intents.zoom).mock.calls.map((c) => c[0]);
     expect(inF.length).toBeGreaterThan(5);
     expect(inF.every((f) => f < 1)).toBe(true);
 
     const down = setup();
-    run(down.g, (i) => [hand(0.5, 0.3 + i * 0.02, true)], 20);
+    run(down.g, (i) => [hand(0.5, 0.3 + i * 0.02)], 20);
     expect(vi.mocked(down.intents.zoom).mock.calls.every((c) => c[0] > 1)).toBe(true);
+
+    const side = setup();
+    run(side.g, (i) => [hand(0.3 + i * 0.02, 0.5)], 20);
+    expect(side.intents.zoom).not.toHaveBeenCalled();
+    expect(up.intents.rotate).not.toHaveBeenCalled();
+    expect(side.intents.rotate).not.toHaveBeenCalled();
   });
 
-  it('a shaky fist that stays put does nothing', () => {
-    const { g, intents } = setup();
-    run(g, (i) => [hand(0.5 + (i % 2 ? 0.015 : -0.015), 0.5 + (i % 3 ? 0.01 : -0.01), true)], 40);
-    expect(intents.rotate).not.toHaveBeenCalled();
-    expect(intents.zoom).not.toHaveBeenCalled();
+  it('a shaky hand that stays put does nothing, open or closed', () => {
+    for (const fist of [true, false]) {
+      const { g, intents } = setup();
+      run(g, (i) => [hand(0.5 + (i % 2 ? 0.015 : -0.015), 0.5 + (i % 3 ? 0.01 : -0.01), fist)], 40);
+      expect(intents.rotate).not.toHaveBeenCalled();
+      expect(intents.zoom).not.toHaveBeenCalled();
+    }
   });
 
   it('a short tracking gap keeps the grab, and the jump when the hand is found again is ignored', () => {
