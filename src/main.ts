@@ -95,6 +95,7 @@ async function boot() {
     next: () => next,
     arrived(layer) {
       next = null;
+      if (hands) ui.hint(null);
       ui.layer(layer.id);
       if (layer.id === 'table') {
         loops++;
@@ -238,7 +239,7 @@ async function boot() {
         onProgress: (p) => ui.toast(`${i18n.t.loadingHands} ${Math.round(p * 100)}%`, 0),
       });
       ui.toast('', 1);
-      ui.hint('hintHands', 14000);
+      ui.hint('hintHands', 0); // stays until the first dive
       camToggle.hidden = false;
       setCamLabel(true);
     } catch (e) {
