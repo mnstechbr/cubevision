@@ -144,7 +144,9 @@ export async function startHands(o: Options): Promise<HandsSession> {
     if (stopped) return;
     if (!busy && !paused && video.readyState >= 2) {
       busy = true;
-      createImageBitmap(video)
+      // Hands fill a good part of the frame at desk distance: a 640-wide copy is plenty for the
+      // tracker and much cheaper to copy and send than the full 1280×720.
+      createImageBitmap(video, { resizeWidth: 640, resizeHeight: Math.round((640 * video.videoHeight) / Math.max(1, video.videoWidth)) })
         .then((bitmap) => worker.postMessage({ type: 'frame', bitmap, t: performance.now() }, [bitmap]))
         .catch(() => (busy = false));
     }

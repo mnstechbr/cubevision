@@ -8,14 +8,18 @@ export interface HandFrame {
   landmarks: Float32Array;
 }
 
-const HOLD_MS = 350; // a hand missing for less than this is assumed still there: no flicker, no reset
-const SETTLE_MS = 250; // a hand that just appeared doesn't act yet (raising it isn't a gesture)
-const YAW_GAIN = 5; // rad per image width of palm travel: short movements are enough
-const PITCH_GAIN = 3;
-const DEADZONE = 0.002;
-const ZOOM_POWER = 2.6; // camera distance follows hand size^-2.6: a little closer = a lot closer
-const ZOOM_DEADZONE = 0.004; // relative size change per frame ignored (tracking noise)
-const STILL_ZOOM = 0.012; // above this relative size change per frame, the palm drift isn't a turn
+// Calibrated on a real recording (test/fixtures/cubevision-maos.json, Logitech-class webcam at ~14 fps):
+// - fingertip reach is cleanly bimodal: fist ≈ 0.6–0.75, open ≈ 1.3–1.45;
+// - a "still" palm jitters ~1.3% of the image width per frame (p90 3%);
+// - hand size jitters ±5% per frame, so it can't drive anything fine.
+const CLOSE_BELOW = 1.0;
+const OPEN_ABOVE = 1.1;
+const SLACK = 0.04; // the hand must move this far (image widths) before the world follows: kills jitter
+const YAW_GAIN = 4; // rad per image width of fist travel
+const ZOOM_GAIN = 3; // log-distance per image height of fist travel (up = in)
+const HOLD_MS = 500; // a hand missing for less than this keeps its state: tracking gaps don't drop the grab
+const REACQUIRE_MS = 120; // after a gap this long the tracker's first position can jump: start over from it
+const SETTLE_MS = 200; // a hand that just appeared doesn't act yet
 
 /** Last hand's raw measurements, shown with ?debug to calibrate against a real camera. */
 export const metrics = { text: '' };
@@ -29,25 +33,28 @@ export function handDistance(L: Float32Array, aspect: number): 'close' | 'far' |
   return size > 0.34 ? 'close' : size < 0.08 ? 'far' : null;
 }
 
-/** Apparent hand size: palm length plus palm width, so turning the hand changes it less. */
-export function handSize(L: Float32Array) {
-  const d = (i: number, j: number) => Math.hypot(L[i * 3] - L[j * 3], L[i * 3 + 1] - L[j * 3 + 1]);
-  return d(0, 9) + d(5, 17);
+/** How far the four fingertips reach past their middle joints, from the wrist (≈1.4 open, ≈0.7 fist). */
+export function fingerReach(L: Float32Array) {
+  const d = (i: number) => Math.hypot(L[i * 3] - L[0], L[i * 3 + 1] - L[1], L[i * 3 + 2] - L[2]);
+  let r = 0;
+  for (const [tip, pip] of [[8, 6], [12, 10], [16, 14], [20, 18]]) r += d(tip) / Math.max(d(pip), 1e-4);
+  return r / 4;
 }
 
 /**
- * Landmarks → intents with one open hand, which is what a webcam tracks best.
- * - Move the palm: the world turns with it, like pushing a globe.
- * - Bring the hand closer to the camera: you move in. Pull it back: you move out.
- *   (Moving in on the glowing spot in the reticle goes through it: that's the dive, handled by zoom.)
- * - Lower the hand: rest. Raising it again picks up from where you are.
- * Pure logic, unit-tested.
+ * Landmarks → intents, one hand:
+ * - open hand: rest (just a cursor), nothing moves;
+ * - close it to grab: drag sideways to turn the world, drag up to move in, down to move out;
+ *   moving in on the glowing spot in the reticle goes through it (the dive, handled by zoom);
+ * - open it to let go.
+ * The world only follows movement beyond a small slack around the hand, which removes the
+ * webcam's jitter without hiding deliberate motion. Pure logic, unit-tested (also on a real recording).
  */
 export class Gestures {
-  private px = new OneEuro();
-  private py = new OneEuro();
-  private ps = new OneEuro(1, 0.5);
-  private last: { x: number; y: number; s: number } | null = null;
+  private px = new OneEuro(0.6, 1);
+  private py = new OneEuro(0.6, 1);
+  private closed = false;
+  private anchor: { x: number; y: number } | null = null;
   private lastSeen = -Infinity;
   private appeared = 0;
   private cursor: Cursor | null = null;
@@ -58,16 +65,21 @@ export class Gestures {
     if (hands.length === 0) {
       if (this.cursor && t - this.lastSeen < HOLD_MS) return [this.cursor];
       this.cursor = null;
+      this.closed = false;
+      this.anchor = null;
       metrics.text = 'no hand';
       return [];
     }
     const L = hands[0].landmarks;
-    if (t - this.lastSeen > HOLD_MS) {
+    const gap = t - this.lastSeen;
+    if (gap > HOLD_MS) {
+      this.closed = false;
+      this.anchor = null;
+      this.appeared = t;
+    }
+    if (gap > REACQUIRE_MS) {
       this.px.reset();
       this.py.reset();
-      this.ps.reset();
-      this.last = null;
-      this.appeared = t;
     }
     this.lastSeen = t;
 
@@ -77,25 +89,32 @@ export class Gestures {
       x += 1 - L[i * 3]; // mirror: the screen acts like a mirror
       y += L[i * 3 + 1];
     }
-    const now = { x: this.px.filter(x / 5, t), y: this.py.filter(y / 5, t), s: this.ps.filter(handSize(L), t) };
+    const palm = { x: this.px.filter(x / 5, t), y: this.py.filter(y / 5, t) };
 
-    let change = 0;
-    if (this.last && t - this.appeared > SETTLE_MS) {
-      change = now.s / this.last.s - 1;
-      if (Math.abs(change) > ZOOM_DEADZONE) {
-        this.intents.zoom(Math.min(1.08, Math.max(0.92, Math.pow(this.last.s / now.s, ZOOM_POWER))));
-      }
-      // While the hand moves toward or away from the camera, its drift isn't meant as a turn.
-      const dx = now.x - this.last.x;
-      const dy = now.y - this.last.y;
-      if (Math.abs(change) < STILL_ZOOM && Math.abs(dx) + Math.abs(dy) > DEADZONE) {
-        this.intents.rotate(dx * YAW_GAIN, dy * PITCH_GAIN);
+    const reach = fingerReach(L);
+    const was = this.closed;
+    this.closed = was ? reach < OPEN_ABOVE : reach < CLOSE_BELOW;
+    if ((this.closed && !was) || (this.closed && gap > REACQUIRE_MS)) this.anchor = { ...palm }; // grab (or re-found): start from here
+    if (!this.closed) this.anchor = null;
+
+    if (this.closed && this.anchor && t - this.appeared > SETTLE_MS) {
+      // Rubber band: the anchor trails the hand by SLACK; only that trailing motion counts.
+      const ox = palm.x - this.anchor.x;
+      const oy = palm.y - this.anchor.y;
+      const d = Math.hypot(ox, oy);
+      if (d > SLACK) {
+        const k = 1 - SLACK / d;
+        const mx = ox * k;
+        const my = oy * k;
+        this.anchor.x += mx;
+        this.anchor.y += my;
+        if (Math.abs(mx) > Math.abs(my) * 0.5) this.intents.rotate(mx * YAW_GAIN, 0);
+        if (Math.abs(my) > Math.abs(mx) * 0.5) this.intents.zoom(Math.exp(my * ZOOM_GAIN)); // up (y↓) = in
       }
     }
-    this.last = now;
 
-    metrics.text = `palm ${now.x.toFixed(2)},${now.y.toFixed(2)} · size ${now.s.toFixed(3)} · ${change > ZOOM_DEADZONE ? 'IN' : change < -ZOOM_DEADZONE ? 'OUT' : 'steady'}`;
-    this.cursor = { x: now.x * 2 - 1, y: -(now.y * 2 - 1), pinch: false, progress: 0 };
+    metrics.text = `reach ${reach.toFixed(2)} (fist <${CLOSE_BELOW}) · ${this.closed ? 'GRAB' : 'open'} · palm ${palm.x.toFixed(2)},${palm.y.toFixed(2)}`;
+    this.cursor = { x: palm.x * 2 - 1, y: -(palm.y * 2 - 1), pinch: this.closed, progress: 0 };
     return [this.cursor];
   }
 }

@@ -149,6 +149,7 @@ async function boot() {
   // Frame loop. Allocation-free; pauses with the tab.
   const fpsEl = ui.$('#fps');
   const reticle = ui.$('#reticle');
+  const guide = ui.$('#hand-guide');
   fpsEl.hidden = !debug;
   let last = performance.now();
   let fpsAcc = 0;
@@ -261,7 +262,10 @@ async function boot() {
         skeleton: ui.$<HTMLCanvasElement>('#cam-skeleton'),
         onDistance: (d) => ui.toast(d === 'close' ? i18n.t.handClose : i18n.t.handFar, 3000),
         intents,
-        onCursors: ui.cursors,
+        onCursors: (c) => {
+          ui.cursors(c);
+          guide.dataset.state = c.length === 0 ? 'none' : c[0].pinch ? 'grab' : 'open';
+        },
         onProgress: (p) => ui.toast(`${i18n.t.loadingHands} ${Math.round(p * 100)}%`, 0),
       });
       ui.toast('', 1);
@@ -269,6 +273,8 @@ async function boot() {
       camToggle.hidden = false;
       setCamLabel(true);
       reticle.classList.add('on');
+      guide.hidden = false;
+      guide.dataset.state = 'none';
       if (params.has('gravar')) addRecordButton();
     } catch (e) {
       console.warn('hands unavailable', e);
@@ -304,6 +310,7 @@ async function boot() {
       hands.stop();
       hands = null;
       reticle.classList.remove('on');
+      guide.hidden = true;
       ui.cursors([]);
       setCamLabel(false);
       pointerHint();

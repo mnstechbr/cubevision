@@ -400,6 +400,70 @@ a:focus-visible {
   box-shadow: 0 0 22px rgb(255 166 61 / 0.45);
 }
 
+#hand-guide {
+  position: fixed;
+  left: 18px;
+  top: 52px;
+  z-index: 15;
+  width: min(300px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--cyan);
+  background: rgb(1 4 9 / 0.62);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dim);
+  pointer-events: none;
+}
+#hand-guide[hidden] {
+  display: none;
+}
+.hg-state {
+  margin: 0 0 8px;
+  letter-spacing: 0.06em;
+}
+.hg-state b {
+  display: none;
+  color: var(--ice);
+}
+#hand-guide[data-state='open'] .hg-open,
+#hand-guide[data-state='none'] .hg-none {
+  display: inline;
+}
+#hand-guide[data-state='grab'] .hg-grab {
+  display: inline;
+  color: var(--amber);
+}
+#hand-guide dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.hg-row {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.hg-row dt {
+  color: var(--cyan);
+  white-space: nowrap;
+}
+.hg-row dd {
+  margin: 0;
+}
+/* the rows that apply to what the hand is doing right now light up */
+#hand-guide[data-state='open'] .hg-row.open,
+#hand-guide[data-state='grab'] .hg-row.grab {
+  opacity: 1;
+  color: var(--ice);
+}
+#hand-guide[data-state='grab'] .hg-row.grab dt {
+  color: var(--amber);
+}
+
 #cursors i {
   position: fixed;
   left: 0;
