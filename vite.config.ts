@@ -11,7 +11,11 @@ const globalHeaders = Object.fromEntries(
 
 export default defineConfig({
   // three.js (WebGPU + TSL) is one ~240 kB gzip chunk by nature; each world is split out.
-  build: { target: 'es2022', chunkSizeWarningLimit: 1000 },
+  build: {
+    target: 'es2022',
+    chunkSizeWarningLimit: 1000,
+    rolldownOptions: { input: { main: 'index.html', privacy: 'privacidade.html' } },
+  },
   worker: { format: 'es' },
   preview: { headers: globalHeaders },
 });

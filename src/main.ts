@@ -22,6 +22,9 @@ const requested = params.get('layer') as LayerId | null;
 const startId: LayerId = requested && ORDER.includes(requested) ? requested : 'table';
 
 const DETAIL = [1, 0.8, 0.6, 0.45];
+
+// Shader warm-up must never block the experience (it can stall while the tab isn't painting).
+const atMost = (p: Promise<unknown>, ms: number) => Promise.race([p, new Promise((r) => setTimeout(r, ms))]);
 const PARTICLES = [1, 0.7, 0.45, 0.3];
 
 async function boot() {
@@ -64,7 +67,7 @@ async function boot() {
   scene.add(first.root);
   orbit.apply(first.view, true);
   first.fade.value = 0.18;
-  await renderer.compileAsync(scene, camera);
+  await atMost(renderer.compileAsync(scene, camera), 4000);
   ui.progress(1);
 
   // Streaming: only the current world and the next one live in memory.
@@ -74,7 +77,7 @@ async function boot() {
     next = null;
     loadLayer(id, ctx())
       .then(async (layer) => {
-        await renderer.compileAsync(layer.root, camera, scene); // no shader hitch mid-dive
+        await atMost(renderer.compileAsync(layer.root, camera, scene), 6000); // no shader hitch mid-dive
         next = layer;
       })
       .catch((e) => console.error('layer load failed', id, e));

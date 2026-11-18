@@ -1,0 +1,75 @@
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-600.css';
+
+:root {
+  color-scheme: dark;
+  --bg: #010409;
+  --cyan: #3fe8ff;
+  --ice: #b8f6ff;
+  --dim: rgb(184 246 255 / 0.72);
+  --line: rgb(63 232 255 / 0.25);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--dim);
+  font: 400 15px/1.7 'IBM Plex Mono', ui-monospace, monospace;
+}
+main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 48px 16px 96px;
+}
+nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 40px;
+}
+a {
+  color: var(--cyan);
+}
+a:focus-visible {
+  outline: 1px solid var(--cyan);
+  outline-offset: 3px;
+}
+h1,
+h2 {
+  color: var(--ice);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+h2 {
+  font-size: 16px;
+  margin: 32px 0 8px;
+  text-transform: uppercase;
+}
+section + section {
+  margin-top: 72px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+.updated {
+  font-size: 12px;
+  margin: 0 0 24px;
+}
+ul {
+  padding-left: 1.2em;
+}
+li + li {
+  margin-top: 6px;
+}
+strong {
+  color: var(--ice);
+  font-weight: 600;
+}
