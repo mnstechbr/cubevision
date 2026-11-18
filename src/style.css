@@ -1,0 +1,357 @@
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-600.css';
+
+:root {
+  --bg: #010409;
+  --cyan: #3fe8ff;
+  --ice: #b8f6ff;
+  --amber: #ffa63d;
+  --dim: rgb(63 232 255 / 0.55);
+  --line: rgb(63 232 255 / 0.28);
+  --font: 'IBM Plex Mono', ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ice);
+  font: 400 15px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  outline: none;
+  cursor: grab;
+}
+#scene:active {
+  cursor: grabbing;
+}
+#scene.on-target {
+  cursor: pointer;
+}
+#scene:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--dim);
+}
+
+button,
+a {
+  font: inherit;
+  color: var(--cyan);
+}
+
+button {
+  background: rgb(63 232 255 / 0.06);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0.55em 1.1em;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+button:hover,
+button:focus-visible {
+  background: rgb(63 232 255 / 0.14);
+  border-color: var(--cyan);
+  box-shadow: 0 0 18px rgb(63 232 255 / 0.25);
+  outline: none;
+}
+button.primary {
+  border-color: var(--cyan);
+  color: var(--ice);
+}
+a:focus-visible {
+  outline: 1px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.8rem;
+  text-align: center;
+  padding: 1.5rem;
+}
+.overlay[hidden] {
+  display: none;
+}
+
+#boot {
+  background: var(--bg);
+  z-index: 20;
+  transition: opacity 0.6s;
+}
+#boot.done {
+  opacity: 0;
+  pointer-events: none;
+}
+.boot-label {
+  margin: 0;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--dim);
+}
+.dots::after {
+  content: '…';
+  animation: blink 1.2s steps(2) infinite;
+}
+.bar {
+  width: min(320px, 70vw);
+  height: 2px;
+  background: var(--line);
+}
+.bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan);
+  transition: width 0.25s;
+}
+#boot-pct {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+#entry {
+  z-index: 10;
+  background: radial-gradient(ellipse at center, rgb(1 4 9 / 0.2), rgb(1 4 9 / 0.75) 70%);
+}
+.panel {
+  max-width: 34rem;
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+}
+.panel h1 {
+  margin: 0;
+  font-weight: 600;
+  font-size: clamp(28px, 5vw, 44px);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ice);
+  text-shadow: 0 0 24px rgb(63 232 255 / 0.6);
+  padding-left: 0.32em;
+}
+.lead {
+  margin: 0;
+  color: var(--ice);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+  max-width: 30rem;
+}
+
+#hud {
+  position: fixed;
+  inset: 0 0 auto 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 14px 18px;
+  z-index: 15;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#hud > * {
+  pointer-events: auto;
+}
+#hud nav {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+#hud button {
+  padding: 0.35em 0.8em;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+#hud a {
+  color: var(--dim);
+  text-decoration: none;
+}
+#hud a:hover {
+  color: var(--cyan);
+}
+#layer-label {
+  color: var(--dim);
+}
+#layer-label b {
+  color: var(--ice);
+  font-weight: 600;
+}
+
+#hint,
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0 1rem;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  z-index: 5;
+  transition: opacity 0.8s;
+  pointer-events: none;
+}
+#toast {
+  bottom: 52px;
+  color: var(--amber);
+}
+#hint.fade {
+  opacity: 0;
+}
+
+#reveal {
+  position: fixed;
+  left: 50%;
+  bottom: 14%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 6;
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  animation: rise 1.6s ease both;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+}
+#reveal[hidden] {
+  display: none;
+}
+#reveal p {
+  margin: 0;
+  letter-spacing: 0.12em;
+  color: var(--ice);
+  text-shadow: 0 0 16px rgb(63 232 255 / 0.5);
+}
+#reveal a {
+  color: var(--amber);
+  letter-spacing: 0.1em;
+}
+
+#cursors i {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  border: 1.5px solid var(--cyan);
+  box-shadow:
+    0 0 14px rgb(63 232 255 / 0.6),
+    inset 0 0 10px rgb(63 232 255 / 0.35);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 8;
+  transition:
+    opacity 0.25s,
+    border-color 0.15s,
+    width 0.15s,
+    height 0.15s;
+  background: conic-gradient(rgb(255 166 61 / 0.55) calc(var(--p, 0) * 1turn), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 54%, #000 56%);
+  mask: radial-gradient(circle, transparent 54%, #000 56%);
+}
+#cursors i.on {
+  opacity: 1;
+}
+#cursors i.pinch {
+  border-color: var(--amber);
+  box-shadow: 0 0 18px rgb(255 166 61 / 0.7);
+}
+
+#cam {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: 160px;
+  border: 1px solid var(--line);
+  transform: scaleX(-1);
+  opacity: 0.35;
+  z-index: 4;
+  display: none;
+  filter: grayscale(1) contrast(1.1);
+}
+#cam.on {
+  display: block;
+}
+
+#fps {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--dim);
+  z-index: 30;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+@media (max-width: 640px) {
+  #hud {
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+  #cam {
+    width: 96px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -4,3 +4,5 @@ dist
 graphify-out/cache
 *.local
 .env*
+public/mediapipe
+.claude/
