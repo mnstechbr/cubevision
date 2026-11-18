@@ -4,7 +4,7 @@ import type { Orbit } from './orbit';
 import type { Particles } from './particles';
 import { cloudPoints, samplePoints, vortexPoints } from './sample';
 
-type State = 'idle' | 'armed' | 'intro' | 'focus' | 'dissolve' | 'wait' | 'reform';
+type State = 'idle' | 'armed' | 'intro' | 'focus' | 'dissolve' | 'wait' | 'reform' | 'reveal';
 
 export interface DiveHost {
   scene: Scene;
@@ -44,6 +44,7 @@ export class Dive {
   private normal = new Vector3();
   private toCam = new Vector3();
   private T: { focus: number; dissolve: number; reform: number; intro: number };
+  private onRevealHold: (() => void) | null = null;
 
   constructor(private host: DiveHost) {
     this.T = host.reducedMotion
@@ -123,6 +124,25 @@ export class Dive {
     this.t = 0;
   }
 
+  /**
+   * The ending: the whole world turns into `points` (the signature), holds,
+   * then rebuilds itself. `onHold` fires when the signature is fully formed.
+   */
+  reveal(points: Float32Array, onHold: () => void) {
+    const { current, particles, orbit } = this.host;
+    if (this.busy) return;
+    samplePoints(current.root, particles.count, particles.from);
+    particles.to.set(points.subarray(0, particles.count * 3));
+    particles.commit();
+    particles.progress.value = 0;
+    particles.swirl.value = current.radius * 0.15;
+    particles.warmth.value = 0;
+    orbit.locked = true;
+    this.onRevealHold = onHold;
+    this.state = 'reveal';
+    this.t = 0;
+  }
+
   update(dt: number) {
     const { current, particles } = this.host;
     if (this.state === 'idle') return;
@@ -140,6 +160,34 @@ export class Dive {
         particles.progress.value = p;
         particles.opacity.value = smooth(0, 0.15, p) * (1 - smooth(0.8, 1, p));
         current.fade.value = smooth(0.55, 1, p);
+        if (p >= 1) this.settle();
+        return;
+      }
+
+      case 'reveal': {
+        // 0–1.8 s form, hold until 7 s, 7–9 s rebuild the world.
+        const t = this.t;
+        if (t < 7) {
+          const p = Math.min(t / 1.8, 1);
+          particles.progress.value = p;
+          particles.opacity.value = smooth(0, 0.3, p) * 1.4;
+          current.fade.value = 1 - 0.85 * smooth(0, 1, p);
+          if (p >= 1 && this.onRevealHold) {
+            this.onRevealHold();
+            this.onRevealHold = null;
+          }
+          return;
+        }
+        if (particles.progress.value >= 1 && t - dt < 7) {
+          particles.chain();
+          samplePoints(current.root, particles.count, particles.to);
+          particles.commit();
+          particles.progress.value = 0;
+        }
+        const p = Math.min((t - 7) / 2, 1);
+        particles.progress.value = p;
+        particles.opacity.value = 1.4 * (1 - smooth(0.6, 1, p));
+        current.fade.value = 0.15 + 0.85 * smooth(0.3, 1, p);
         if (p >= 1) this.settle();
         return;
       }

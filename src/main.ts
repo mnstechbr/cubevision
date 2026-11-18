@@ -6,6 +6,8 @@ import { ORDER, loadLayer, nextOf, type Layer, type LayerId } from './engine/lay
 import { Orbit } from './engine/orbit';
 import { Particles } from './engine/particles';
 import { createGovernor, createStage } from './engine/stage';
+import { textPoints } from './engine/text';
+import { Vector3 } from 'three/webgpu';
 import { i18n } from './i18n';
 import type { HandsSession } from './input/hands';
 import { attachPointer, type Intents } from './input/pointer';
@@ -93,7 +95,7 @@ async function boot() {
       ui.layer(layer.id);
       if (layer.id === 'table') {
         loops++;
-        showReveal();
+        setTimeout(showReveal, 600);
       }
       findHint = 0;
       preload(nextOf(layer.id));
@@ -124,11 +126,19 @@ async function boot() {
     activate: () => dive.start(),
   };
 
+  // The ending (each time the loop closes): the workshop becomes the signature, then itself again.
   const revealEl = ui.$('#reveal');
   function showReveal() {
-    if (loops < 1) return;
-    revealEl.hidden = false;
-    setTimeout(() => (revealEl.hidden = true), 11000);
+    if (dive.state !== 'idle') return;
+    const pts = new Float32Array(particles.max * 3);
+    const center = new Vector3(0, host.current.view.height + 0.6, 0);
+    const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const up = new Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+    textPoints('MNS TECH', particles.max, center, right, up, 5.2, pts);
+    dive.reveal(pts, () => {
+      revealEl.hidden = false;
+      setTimeout(() => (revealEl.hidden = true), 9000);
+    });
   }
 
   // Frame loop. Allocation-free; pauses with the tab.
