@@ -21,6 +21,8 @@ export interface DiveHost {
 
 const smooth = (a: number, b: number, x: number) => MathUtils.smoothstep(x, a, b);
 const UP = new Vector3(0, 1, 0);
+const PAUSE = 0.35; // s without zooming that makes the next push a new one
+const ARRIVAL_GRACE = 1.5; // s after arriving in a world before moving in can enter the next
 
 /**
  * The dive: camera flies to the target → the target dissolves into particles →
@@ -36,6 +38,10 @@ export class Dive {
   private yaw = 0;
   private incoming: Layer | null = null;
   private center2 = new Vector3();
+  private clock = 0;
+  private lastZoom = -1;
+  private atLimitSince = -1;
+  private noEntryUntil = ARRIVAL_GRACE;
   private edge = new Vector3();
   private quat = new Quaternion();
   private normal = new Vector3();
@@ -91,12 +97,28 @@ export class Dive {
         current.target.object.getWorldPosition(this.center);
         orbit.goal.target.lerp(this.center, Math.min(1, (1 - f) * 3));
       }
-      if (orbit.goal.distance <= orbit.minDistance * 1.02) return this.start();
+      if (orbit.goal.distance <= orbit.minDistance * 1.02) {
+        // Two steps, never by accident: reach the limit, stop, then move in again to enter.
+        const now = this.clock;
+        const fresh = now - this.lastZoom > PAUSE;
+        this.lastZoom = now;
+        if (this.atLimitSince < 0) this.atLimitSince = now;
+        else if (fresh && now > this.noEntryUntil) return this.start();
+        return;
+      }
+      this.atLimitSince = -1;
     } else if (f > 1) {
+      this.atLimitSince = -1;
       this.center.set(0, current.view.height, 0);
       orbit.goal.target.lerp(this.center, Math.min(1, (f - 1) * 2));
     }
+    this.lastZoom = this.clock;
     orbit.zoom(f);
+  }
+
+  /** At the closest distance, aimed, waiting for a second push to enter. */
+  get atEntry() {
+    return this.atLimitSince >= 0 && this.state === 'idle';
   }
 
   start() {
@@ -147,6 +169,7 @@ export class Dive {
 
   update(dt: number) {
     const { current, particles } = this.host;
+    this.clock += dt;
     if (this.state === 'idle') return;
     this.t += dt;
     const T = this.T;
@@ -303,5 +326,7 @@ export class Dive {
     orbit.stiffness = 6;
     orbit.locked = false;
     this.state = 'idle';
+    this.atLimitSince = -1;
+    this.noEntryUntil = this.clock + ARRIVAL_GRACE; // just arrived: look around before you can enter again
   }
 }

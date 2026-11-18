@@ -186,9 +186,10 @@ async function boot() {
     if (hands) {
       // Say out loud what the hand is doing to the camera.
       const recent = performance.now() - zooming.at < 400 && dive.state === 'idle';
-      const atLimit = recent && zooming.dir > 0 && orbit.goal.distance <= orbit.minDistance * 1.02;
-      zoomInd.classList.toggle('on', recent);
-      if (recent) zoomInd.textContent = atLimit ? i18n.t.zoomLimit : zooming.dir > 0 ? i18n.t.zoomIn : i18n.t.zoomOut;
+      const atLimit = zooming.dir > 0 && orbit.goal.distance <= orbit.minDistance * 1.02;
+      const show = recent || dive.atEntry;
+      zoomInd.classList.toggle('on', show);
+      if (show) zoomInd.textContent = dive.atEntry ? i18n.t.zoomEnter : atLimit ? i18n.t.zoomLimit : zooming.dir > 0 ? i18n.t.zoomIn : i18n.t.zoomOut;
       const aimed = dive.state === 'idle' && dive.hits(0, 0, AIM);
       reticle.classList.toggle('aimed', aimed);
       const span = Math.max(1e-3, cur.view.distance - orbit.minDistance);

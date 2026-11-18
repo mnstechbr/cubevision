@@ -101,17 +101,37 @@ describe('zooming through the target', () => {
     const host = { scene: new Scene(), camera, orbit, particles: new Particles(10), current: room, reducedMotion: false, next: () => null, arrived() {} };
     return { dive: new Dive(host), orbit };
   }
-  const zoomIn = (dive: Dive, orbit: Orbit) => {
-    for (let i = 0; i < 240 && dive.state === 'idle'; i++) {
+  const zoomIn = (dive: Dive, orbit: Orbit, frames = 240) => {
+    for (let i = 0; i < frames && dive.state === 'idle'; i++) {
       dive.zoom(0.97, 0.3);
+      dive.update(1 / 60);
+      orbit.update(1 / 60);
+    }
+  };
+  const pause = (dive: Dive, orbit: Orbit, s: number) => {
+    for (let i = 0; i < s * 60; i++) {
+      dive.update(1 / 60);
       orbit.update(1 / 60);
     }
   };
 
-  it('moving in with the spot in the reticle ends in a dive', async () => {
+  it('moving in on the spot stops at the limit; only a second push after a pause enters', async () => {
     const { dive, orbit } = await at(0);
+    pause(dive, orbit, 2); // past the arrival grace
     zoomIn(dive, orbit);
+    expect(dive.state).toBe('idle'); // one long push never enters by itself
+    expect(dive.atEntry).toBe(true);
+    pause(dive, orbit, 0.5);
+    zoomIn(dive, orbit, 5);
     expect(dive.state).toBe('focus');
+  });
+
+  it('right after arriving, moving in cannot enter yet', async () => {
+    const { dive, orbit } = await at(0);
+    zoomIn(dive, orbit, 30);
+    pause(dive, orbit, 0.4);
+    zoomIn(dive, orbit, 30); // still inside the grace period after (pretend) arrival
+    expect(dive.state).toBe('idle');
   });
 
   it('moving in elsewhere just stops at the closest distance', async () => {

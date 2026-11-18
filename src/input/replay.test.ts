@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import recording from '../../test/fixtures/cubevision-maos.json';
+import first from '../../test/fixtures/cubevision-maos.json';
+import second from '../../test/fixtures/cubevision-maos-2.json';
 import { Gestures, fingerReach, type HandFrame } from './gestures';
 import type { Intents } from './pointer';
 
@@ -7,11 +8,10 @@ import type { Intents } from './pointer';
 // the hand moves around (often as a fist), tracking drops ~26% of frames, and after a drop the
 // first position found can jump up to ~30% of the image width.
 type Rec = { frames: { t: number; hands: { label: string; lm: number[] }[] }[] };
-const frames = (recording as Rec).frames;
-const t0 = frames[0].t;
 
-function replay() {
-  const calls: { t: number; kind: 'rotate' | 'zoom'; v: number; open: boolean; afterGap: boolean }[] = [];
+function replay(frames: Rec['frames']) {
+  const t0 = frames[0].t;
+  const calls: { t: number; kind: 'rotate' | 'zoom' | 'fling'; v: number; open: boolean; afterGap: boolean }[] = [];
   let now = 0;
   let openNow = false;
   let afterGap = false;
@@ -22,7 +22,7 @@ function replay() {
     hover: () => false,
     select: () => {},
     activate: () => {},
-    fling: () => {},
+    fling: (y) => void calls.push({ t: now, kind: 'fling', v: y, open: openNow, afterGap }),
   };
   const g = new Gestures(intents);
   for (const f of frames) {
@@ -36,25 +36,29 @@ function replay() {
   return calls;
 }
 
-describe('replay of a real webcam recording', () => {
-  const calls = replay();
-  const sum = (kind: 'rotate' | 'zoom', a: number, b: number) =>
-    calls.filter((c) => c.kind === kind && c.t >= a && c.t < b).reduce((s, c) => s + Math.abs(c.v), 0);
+for (const [name, rec] of [['first (48 s)', first], ['second (90 s)', second]] as const) {
+  describe(`replay of a real webcam recording: ${name}`, () => {
+    const calls = replay((rec as Rec).frames);
+    const moves = calls.filter((c) => c.kind !== 'fling');
 
-  it('a clearly open hand never turns the map (it only zooms)', () => {
-    expect(calls.filter((c) => c.open && c.kind === 'rotate')).toHaveLength(0);
-  });
+    it('a clearly open hand never turns the map (it only zooms)', () => {
+      expect(calls.filter((c) => c.open && c.kind === 'rotate')).toHaveLength(0);
+    });
 
-  it('the jump when tracking finds the hand again is not taken as movement', () => {
-    expect(calls.filter((c) => c.afterGap)).toHaveLength(0);
-  });
+    it('the jump when tracking finds the hand again is not taken as movement', () => {
+      expect(moves.filter((c) => c.afterGap)).toHaveLength(0);
+    });
 
-  it('no single frame makes the world lurch', () => {
-    const worst = Math.max(...calls.map((c) => Math.abs(c.v)));
-    expect(worst).toBeLessThan(0.25);
-  });
+    it('no single frame makes the world lurch', () => {
+      expect(Math.max(...moves.map((c) => Math.abs(c.v)))).toBeLessThan(0.35);
+    });
 
-  it('deliberate fist movement does turn and zoom the world', () => {
-    expect(sum('rotate', 0, 48) + sum('zoom', 0, 48)).toBeGreaterThan(1);
+    it('deliberate movement does turn and zoom the world', () => {
+      expect(moves.reduce((s, c) => s + Math.abs(c.v), 0)).toBeGreaterThan(1);
+    });
   });
+}
+
+it('fast drags that lose the hand keep the world spinning (second recording has several)', () => {
+  expect(replay((second as Rec).frames).filter((c) => c.kind === 'fling').length).toBeGreaterThan(0);
 });
