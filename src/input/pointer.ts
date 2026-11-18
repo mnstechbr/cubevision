@@ -7,12 +7,10 @@ export interface Intents {
   rotate(dYaw: number, dPitch: number): void;
   /** Multiplies camera distance (<1 = closer). */
   zoom(factor: number): void;
-  /** Cursor position in NDC (-1..1), or null when it leaves. */
-  hover(x: number, y: number): void;
-  /** "Do it here": mouse/touch dive straight in; hands arm the target first. */
-  select(x: number, y: number, mode: 'dive' | 'arm'): void;
-  /** Hands: 0..1 progress of pulling the target open. */
-  expand(amount: number): void;
+  /** Cursor position in NDC (-1..1). Returns whether it is on the target. */
+  hover(x: number, y: number): boolean;
+  /** Dive into the target, if the cursor (NDC) is on it. */
+  select(x: number, y: number): void;
   /** Keyboard: dive into the current target wherever it is. */
   activate(): void;
 }
@@ -64,7 +62,7 @@ export function attachPointer(el: HTMLElement, intents: Intents) {
     if (pts.size < 2) pinch = 0;
     if (!p || pts.size > 0) return;
     const moved = Math.hypot(e.clientX - p.sx, e.clientY - p.sy);
-    if (moved < CLICK_PX && performance.now() - p.t < CLICK_MS) intents.select(...ndc(e), 'dive');
+    if (moved < CLICK_PX && performance.now() - p.t < CLICK_MS) intents.select(...ndc(e));
   };
   const wheel = (e: WheelEvent) => {
     e.preventDefault();

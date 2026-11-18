@@ -117,17 +117,11 @@ async function boot() {
     hover(x, y) {
       hovered = !dive.busy && dive.hits(x, y);
       canvas.classList.toggle('on-target', hovered);
+      return hovered;
     },
-    select(x, y, mode) {
-      if (dive.busy) return;
-      if (!dive.hits(x, y)) {
-        if (mode === 'arm') dive.disarm();
-        return;
-      }
-      if (mode === 'dive') dive.start();
-      else dive.arm();
+    select(x, y) {
+      if (!dive.busy && dive.hits(x, y)) dive.start();
     },
-    expand: (a) => dive.expand(a),
     activate: () => dive.start(),
   };
 
@@ -235,7 +229,6 @@ async function boot() {
         skeleton: ui.$<HTMLCanvasElement>('#cam-skeleton'),
         onDistance: (d) => ui.toast(d === 'close' ? i18n.t.handClose : i18n.t.handFar, 3000),
         intents,
-        armed: () => dive.state === 'armed',
         onCursors: ui.cursors,
         onProgress: (p) => ui.toast(`${i18n.t.loadingHands} ${Math.round(p * 100)}%`, 0),
       });

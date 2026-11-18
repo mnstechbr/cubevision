@@ -15,7 +15,6 @@ interface Options {
   intents: Intents;
   /** Coaching: the hand is too close to or too far from the camera. */
   onDistance(d: 'close' | 'far'): void;
-  armed: () => boolean;
   onCursors(c: Cursor[]): void;
   onProgress(p: number): void;
 }
@@ -35,8 +34,8 @@ function timeout<T>(p: Promise<T>, ms: number, what: string) {
 const openCamera = () =>
   timeout(
     navigator.mediaDevices.getUserMedia({
-      // 16:9 is wider than 4:3 on most webcams (more room for the hands) and matches the screen.
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 }, facingMode: 'user', frameRate: { ideal: 30 } },
+      // 4:3 on purpose: the palm detector sees a small square, and a wide frame makes hands tinier to it.
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user', frameRate: { ideal: 30 } },
       audio: false,
     }),
     CAMERA_TIMEOUT,
@@ -99,7 +98,7 @@ export async function startHands(o: Options): Promise<HandsSession> {
   const aspect = video.videoWidth / Math.max(1, video.videoHeight);
   let lastCoach = 0;
 
-  const gestures = new Gestures(o.intents, o.armed);
+  const gestures = new Gestures(o.intents);
   let busy = false;
   let paused = false;
   let stopped = false;
@@ -122,8 +121,7 @@ export async function startHands(o: Options): Promise<HandsSession> {
     if (stopped) return;
     if (!busy && !paused && video.readyState >= 2) {
       busy = true;
-      // The tracker works at ~224 px anyway: a small frame is cheaper to copy and send.
-      createImageBitmap(video, { resizeWidth: 640, resizeHeight: Math.round((640 * video.videoHeight) / Math.max(1, video.videoWidth)), resizeQuality: 'low' })
+      createImageBitmap(video)
         .then((bitmap) => worker.postMessage({ type: 'frame', bitmap, t: performance.now() }, [bitmap]))
         .catch(() => (busy = false));
     }

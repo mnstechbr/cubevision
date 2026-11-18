@@ -52,10 +52,12 @@ Fluxo: **câmera → MediaPipe (21 pontos por mão) → filtro de suavização �
 
 | Gesto | Ação |
 |---|---|
-| Mão aberta movendo | Olhar em volta / girar o objeto |
-| Pinça (polegar + indicador) | Selecionar alvo / agarrar |
-| Duas mãos se afastando | Expandir e, passando do limite, **mergulhar** |
-| Punho fechado puxando pra trás | Voltar uma camada *(a validar)* |
+| Mover a mão (centro da palma) | Move o cursor; sozinho nunca gira o mundo |
+| Cursor perto da borda da tela | Gira o mundo para aquele lado |
+| Cursor parado no ponto que brilha (~1 s) | Mergulha |
+| Pinça e arrastar *(bônus, quando a pinça é lida)* | Gira o mundo |
+
+> Revisado em 2026-11-18 após teste real com webcam: gestos que dependem da pose dos dedos (pinça, punho, duas mãos) falharam demais. O esquema atual só precisa que a mão seja vista.
 
 - **Profundidade:** webcam não mede bem a profundidade, então "empurrar" é aproximado pelo **tamanho da mão na imagem**. Os gestos principais não dependem disso.
 - **Suavização:** filtro *One Euro* nos pontos, senão a cena treme junto com a mão.

@@ -4,7 +4,7 @@ import type { Orbit } from './orbit';
 import type { Particles } from './particles';
 import { cloudPoints, samplePoints, vortexPoints } from './sample';
 
-type State = 'idle' | 'armed' | 'intro' | 'focus' | 'dissolve' | 'wait' | 'reform' | 'reveal';
+type State = 'idle' | 'intro' | 'focus' | 'dissolve' | 'wait' | 'reform' | 'reveal';
 
 export interface DiveHost {
   scene: Scene;
@@ -35,8 +35,6 @@ export class Dive {
   private scale = 1;
   private yaw = 0;
   private incoming: Layer | null = null;
-  private baseScale = 1;
-  private sinceExpand = 0;
   private center2 = new Vector3();
   private edge = new Vector3();
   private quat = new Quaternion();
@@ -52,7 +50,7 @@ export class Dive {
   }
 
   get busy() {
-    return this.state !== 'idle' && this.state !== 'armed';
+    return this.state !== 'idle';
   }
 
   /**
@@ -79,35 +77,8 @@ export class Dive {
     return Math.hypot((x - this.center2.x) * a, y - this.center2.y) < reach;
   }
 
-  /** Hands: pinch on the target focuses it and waits for the spread gesture. */
-  arm() {
-    if (this.busy || this.state === 'armed') return;
-    this.state = 'armed';
-    this.sinceExpand = 0;
-    this.baseScale = this.host.current.target.object.scale.x;
-    this.focusCamera(5);
-  }
-
-  disarm() {
-    if (this.state !== 'armed') return;
-    this.state = 'idle';
-    this.host.current.target.object.scale.setScalar(this.baseScale);
-    this.host.orbit.apply(this.host.current.view);
-  }
-
-  /** 0..1 progress of the "pull it open" gesture; reaching 1 dives. */
-  expand(amount: number) {
-    if (this.state !== 'armed') return;
-    this.sinceExpand = 0;
-    const a = MathUtils.clamp(amount, 0, 1);
-    this.host.current.target.object.scale.setScalar(this.baseScale * (1 + a * 0.35));
-    this.host.current.glow.value = Math.max(this.host.current.glow.value, 0.4 + a * 0.6);
-    if (a >= 1) this.start();
-  }
-
   start() {
     if (this.busy) return;
-    if (this.state === 'armed') this.host.current.target.object.scale.setScalar(this.baseScale);
     this.state = 'focus';
     this.t = 0;
     this.host.orbit.locked = true;
@@ -159,11 +130,6 @@ export class Dive {
     const T = this.T;
 
     switch (this.state) {
-      case 'armed':
-        this.sinceExpand += dt;
-        if (this.sinceExpand > 6) this.disarm();
-        return;
-
       case 'intro': {
         const p = Math.min(this.t / T.intro, 1);
         particles.progress.value = p;

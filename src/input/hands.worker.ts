@@ -16,8 +16,8 @@ self.onmessage = async (e: MessageEvent) => {
           baseOptions: { modelAssetBuffer: model, delegate },
           runningMode: 'VIDEO',
           numHands: 2,
-          minHandDetectionConfidence: 0.6,
-          minHandPresenceConfidence: 0.6,
+          minHandDetectionConfidence: 0.5,
+          minHandPresenceConfidence: 0.5,
           minTrackingConfidence: 0.5,
         });
       landmarker = await make('GPU').catch(() => make('CPU'));
