@@ -36,6 +36,7 @@ export class Dive {
   private yaw = 0;
   private incoming: Layer | null = null;
   private center2 = new Vector3();
+  private previewBase = 0;
   private edge = new Vector3();
   private quat = new Quaternion();
   private normal = new Vector3();
@@ -77,8 +78,23 @@ export class Dive {
     return Math.hypot((x - this.center2.x) * a, y - this.center2.y) < reach;
   }
 
+  /** 0..1 preview of tearing the target open (it swells and burns brighter). */
+  preview(amount: number) {
+    if (this.busy) return;
+    const o = this.host.current.target.object;
+    if (!this.previewBase) this.previewBase = o.scale.x;
+    const a = MathUtils.clamp(amount, 0, 1);
+    o.scale.setScalar(this.previewBase * (1 + a * 0.45));
+    this.host.current.glow.value = Math.max(this.host.current.glow.value, a);
+    if (a === 0) this.previewBase = 0;
+  }
+
   start() {
     if (this.busy) return;
+    if (this.previewBase) {
+      this.host.current.target.object.scale.setScalar(this.previewBase);
+      this.previewBase = 0;
+    }
     this.state = 'focus';
     this.t = 0;
     this.host.orbit.locked = true;

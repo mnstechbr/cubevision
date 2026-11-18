@@ -24,6 +24,8 @@ export class Orbit {
   /** Camera follow speed (1/s). */
   stiffness = 6;
   private idle = 0;
+  private spinYaw = 0;
+  private spinPitch = 0;
   private lastNear = 0;
 
   constructor(
@@ -40,8 +42,17 @@ export class Orbit {
     if (snap) copy(this.goal, this.now);
   }
 
+  /** Keep turning at this speed (rad/s), slowing down on its own. */
+  fling(vYaw: number, vPitch: number) {
+    if (this.locked) return;
+    const cap = 6;
+    this.spinYaw = Math.max(-cap, Math.min(cap, vYaw));
+    this.spinPitch = Math.max(-cap, Math.min(cap, vPitch)) * 0.5;
+  }
+
   rotate(dYaw: number, dPitch: number) {
     if (this.locked) return;
+    this.spinYaw = this.spinPitch = 0;
     this.goal.yaw -= dYaw;
     this.goal.pitch = MathUtils.clamp(this.goal.pitch + dPitch, -PITCH_LIMIT, PITCH_LIMIT);
     this.idle = 0;
@@ -68,6 +79,15 @@ export class Orbit {
   update(dt: number) {
     const g = this.goal;
     const n = this.now;
+    if (this.locked) this.spinYaw = this.spinPitch = 0;
+    if (this.spinYaw || this.spinPitch) {
+      g.yaw -= this.spinYaw * dt;
+      g.pitch = MathUtils.clamp(g.pitch + this.spinPitch * dt, -PITCH_LIMIT, PITCH_LIMIT);
+      const decay = Math.exp(-dt * 1.8);
+      this.spinYaw = Math.abs(this.spinYaw * decay) < 0.02 ? 0 : this.spinYaw * decay;
+      this.spinPitch = Math.abs(this.spinPitch * decay) < 0.02 ? 0 : this.spinPitch * decay;
+      this.idle = 0;
+    }
     // Gentle drift after a few idle seconds keeps the hologram alive.
     this.idle += dt;
     if (!this.locked && !this.reducedMotion && this.idle > 5) g.yaw += dt * 0.06;

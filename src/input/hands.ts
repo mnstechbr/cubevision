@@ -3,6 +3,8 @@ import { Gestures, handDistance, type HandFrame } from './gestures';
 import type { Intents } from './pointer';
 
 export interface HandsSession {
+  /** With ?gravar: the landmark numbers seen so far as JSON (no images), or null. */
+  recording(): string | null;
   stop(): void;
   pause(): void;
   resume(): void;
@@ -34,8 +36,8 @@ function timeout<T>(p: Promise<T>, ms: number, what: string) {
 const openCamera = () =>
   timeout(
     navigator.mediaDevices.getUserMedia({
-      // 4:3 on purpose: the palm detector sees a small square, and a wide frame makes hands tinier to it.
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user', frameRate: { ideal: 30 } },
+      // 16:9 at full sensor width: on most webcams 4:3 crops the sides, and both hands must fit.
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 }, facingMode: 'user', frameRate: { ideal: 30 } },
       audio: false,
     }),
     CAMERA_TIMEOUT,
@@ -99,6 +101,8 @@ export async function startHands(o: Options): Promise<HandsSession> {
   let lastCoach = 0;
 
   const gestures = new Gestures(o.intents);
+  // Calibration aid: only numbers (21 points per hand), capped at ~3 min, never sent anywhere.
+  const rec = new URLSearchParams(location.search).has('gravar') ? ([] as { t: number; hands: { label: string; lm: number[] }[] }[]) : null;
   let busy = false;
   let paused = false;
   let stopped = false;
@@ -107,6 +111,7 @@ export async function startHands(o: Options): Promise<HandsSession> {
     if (e.data.type !== 'result') return;
     busy = false;
     const hands = e.data.hands as HandFrame[];
+    if (rec && rec.length < 6000) rec.push({ t: Math.round(e.data.t), hands: hands.map((h) => ({ label: h.label, lm: Array.from(h.landmarks, (v) => Math.round(v * 1e4) / 1e4) })) });
     o.onCursors(gestures.update(hands, e.data.t));
     drawSkeleton(g, sk.width, sk.height, hands);
     const d = hands[0] && handDistance(hands[0].landmarks, aspect);
@@ -136,6 +141,7 @@ export async function startHands(o: Options): Promise<HandsSession> {
   };
 
   return {
+    recording: () => (rec ? JSON.stringify({ video: [video.videoWidth, video.videoHeight], frames: rec }) : null),
     stop() {
       stopped = true;
       release();

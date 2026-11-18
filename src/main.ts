@@ -1,6 +1,8 @@
 import './style.css';
 import { Dive, type DiveHost } from './engine/dive';
 import { createDust } from './engine/dust';
+import { createWarp } from './engine/warp';
+import { updateCallouts } from './hud';
 import { holo } from './engine/holo';
 import { ORDER, loadLayer, nextOf, type Layer, type LayerId } from './engine/layers';
 import { Orbit } from './engine/orbit';
@@ -53,6 +55,8 @@ async function boot() {
   const orbit = new Orbit(camera, reducedMotion);
   const dust = createDust(touchFirst ? 300 : 900);
   scene.add(dust.object);
+  const warp = createWarp(touchFirst ? 250 : 500);
+  scene.add(warp.object);
   const governor = createGovernor(
     (level) => {
       stage.setQuality(level);
@@ -107,7 +111,7 @@ async function boot() {
     },
   };
   const dive = new Dive(host);
-  if (debug) Object.assign(window, { cv: { dive, orbit, host, intents: () => intents } });
+  if (debug) Object.assign(window, { cv: { dive, orbit, host, stage, intents: () => intents } });
 
   let hovered = false;
   let hands: HandsSession | null = null;
@@ -123,6 +127,8 @@ async function boot() {
       if (!dive.busy && dive.hits(x, y)) dive.start();
     },
     activate: () => dive.start(),
+    pull: (a) => dive.preview(a),
+    fling: (y, p) => orbit.fling(y, p),
   };
 
   // The ending (each time the loop closes): the workshop becomes the signature, then itself again.
@@ -155,6 +161,23 @@ async function boot() {
     dust.scale.value = orbit.now.distance;
     dive.update(dt);
     const cur = host.current;
+    // Streaks peak between worlds: rising while the target dissolves, fading as the next world forms.
+    const pr = particles.progress.value;
+    const w = dive.state === 'dissolve' ? pr : dive.state === 'wait' ? 1 : dive.state === 'reform' ? 1 - pr * pr : 0;
+    warp.amount.value = reducedMotion ? w * 0.3 : w;
+    warp.object.visible = w > 0.01;
+    if (warp.object.visible) {
+      warp.object.position.copy(camera.position);
+      warp.object.quaternion.copy(camera.quaternion);
+      warp.object.scale.setScalar(orbit.now.distance * 0.5);
+    }
+    // Exposure follows whichever world fills the screen (the incoming one once it takes over).
+    const lit = dive.state === 'reform' && pr > 0.5 && next ? (next.exposure ?? 1) : (cur.exposure ?? 1);
+    stage.exposure.value += (lit - stage.exposure.value) * Math.min(1, dt * 2.5);
+    // A band of brighter light sweeps up through the world every few seconds.
+    holo.sweepY.value = orbit.now.target.y - cur.radius * 0.6 + ((t * 0.35) % 3) * cur.radius * 0.6;
+    holo.sweepWidth.value = cur.radius * 0.04;
+    updateCallouts(cur, camera, started && dive.state === 'idle' && cur.fade.value > 0.95);
     if (dive.state === 'idle') cur.glow.value += ((hovered ? 0.75 : 0) - cur.glow.value) * Math.min(1, dt * 6);
     cur.update(t, dt);
     if (next && next.root.parent) next.update(t, dt);
@@ -236,12 +259,30 @@ async function boot() {
       ui.hint('hintHands', 0); // stays until the first dive
       camToggle.hidden = false;
       setCamLabel(true);
+      if (params.has('gravar')) addRecordButton();
     } catch (e) {
       console.warn('hands unavailable', e);
       hands = null;
       ui.toast(i18n.t.camDenied);
       pointerHint();
     }
+  }
+
+  // ?gravar: a button that saves the recorded hand points as a file, to calibrate the gestures.
+  function addRecordButton() {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = i18n.lang === 'pt' ? 'Salvar gravação' : 'Save recording';
+    b.addEventListener('click', () => {
+      const json = hands?.recording();
+      if (!json) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      a.download = 'cubevision-maos.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+    camToggle.after(b);
   }
 
   function setCamLabel(on: boolean) {

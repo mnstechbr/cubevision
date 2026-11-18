@@ -1,5 +1,6 @@
 import { Color, PerspectiveCamera, RenderPipeline, Scene, WebGPURenderer } from 'three/webgpu';
 import { float, length, mix, pass, screenCoordinate, screenUV, sin, smoothstep, uniform, vec2, vec4 } from 'three/tsl';
+import type { Fade } from './holo';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { chromaticAberration } from 'three/addons/tsl/display/ChromaticAberrationNode.js';
 
@@ -8,6 +9,8 @@ export interface Stage {
   scene: Scene;
   camera: PerspectiveCamera;
   pipeline: RenderPipeline;
+  /** Scene brightness before bloom (dense worlds turn it down so they don't burn to white). */
+  exposure: Fade;
   /** 0 = best … 3 = lowest. */
   setQuality(level: number): void;
   resize(): void;
@@ -24,7 +27,8 @@ export async function createStage(canvas: HTMLCanvasElement, reducedMotion: bool
   const camera = new PerspectiveCamera(50, 1, 0.1, 1000);
 
   const scenePass = pass(scene, camera);
-  const color = scenePass.getTextureNode('output');
+  const exposure = uniform(1);
+  const color = scenePass.getTextureNode('output').mul(exposure);
   const glow = bloom(color, 1.15, 0.55, 0.02);
   const lit = color.add(glow);
 
@@ -49,6 +53,7 @@ export async function createStage(canvas: HTMLCanvasElement, reducedMotion: bool
     scene,
     camera,
     pipeline,
+    exposure,
     setQuality(next) {
       if (next === level) return;
       level = next;

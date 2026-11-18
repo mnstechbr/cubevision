@@ -19,7 +19,7 @@ const dict = {
     handFar: 'Mão muito longe. Chegue um pouco mais perto da câmera.',
     hintMouse: 'Arraste para girar · role para aproximar · clique no ponto que brilha',
     hintTouch: 'Arraste para girar · pinça para aproximar · toque no ponto que brilha',
-    hintHands: 'Mova a mão para apontar · leve o cursor até a borda para girar · pare sobre o ponto que brilha para mergulhar',
+    hintHands: 'Feche a mão para agarrar e girar · solte para deixar girando · feche as duas mãos sobre o ponto que brilha e afaste para abrir',
     hintFind: 'Algo brilha atrás do cubo…',
     layer: 'camada',
     names: {
@@ -54,7 +54,7 @@ const dict = {
     handFar: 'Hand too far. Come a little closer to the camera.',
     hintMouse: 'Drag to turn · scroll to zoom · click the glowing spot',
     hintTouch: 'Drag to turn · pinch to zoom · tap the glowing spot',
-    hintHands: 'Move your hand to point · take the cursor to an edge to turn · rest on the glowing spot to dive',
+    hintHands: 'Close your hand to grab and turn · let go to spin · close both hands over the glowing spot and pull apart to open it',
     hintFind: 'Something glows behind the cube…',
     layer: 'layer',
     names: {

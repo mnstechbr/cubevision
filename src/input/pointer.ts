@@ -11,8 +11,12 @@ export interface Intents {
   hover(x: number, y: number): boolean;
   /** Dive into the target, if the cursor (NDC) is on it. */
   select(x: number, y: number): void;
-  /** Keyboard: dive into the current target wherever it is. */
+  /** Dive into the current target wherever it is (keyboard, or a hand gesture already on it). */
   activate(): void;
+  /** Hands: 0..1 of tearing the target open (visual preview before the dive). */
+  pull(amount: number): void;
+  /** Let go of a spin: radians/second of yaw and pitch that then decay. */
+  fling(vYaw: number, vPitch: number): void;
 }
 
 const CLICK_PX = 7;
@@ -20,7 +24,7 @@ const CLICK_MS = 450;
 
 /** Mouse, trackpad, touch (via Pointer Events) and keyboard. Returns a detach function. */
 export function attachPointer(el: HTMLElement, intents: Intents) {
-  const pts = new Map<number, { x: number; y: number; sx: number; sy: number; t: number }>();
+  const pts = new Map<number, { x: number; y: number; sx: number; sy: number; t: number; lt: number; vy: number; vp: number }>();
   let pinch = 0;
 
   const ndc = (e: { clientX: number; clientY: number }) => {
@@ -34,7 +38,8 @@ export function attachPointer(el: HTMLElement, intents: Intents) {
 
   const down = (e: PointerEvent) => {
     el.setPointerCapture(e.pointerId);
-    pts.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now() });
+    const now = performance.now();
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: now, lt: now, vy: 0, vp: 0 });
     if (pts.size === 2) pinch = spread();
   };
   const move = (e: PointerEvent) => {
@@ -48,7 +53,14 @@ export function attachPointer(el: HTMLElement, intents: Intents) {
     p.x = e.clientX;
     p.y = e.clientY;
     if (pts.size === 1) {
-      intents.rotate((dx / el.clientWidth) * Math.PI * 1.4, (dy / el.clientHeight) * Math.PI * 0.8);
+      const yaw = (dx / el.clientWidth) * Math.PI * 1.4;
+      const pitch = (dy / el.clientHeight) * Math.PI * 0.8;
+      intents.rotate(yaw, pitch);
+      const now = performance.now();
+      const dts = Math.max(0.004, (now - p.lt) / 1000);
+      p.lt = now;
+      p.vy += (yaw / dts - p.vy) * 0.35;
+      p.vp += (pitch / dts - p.vp) * 0.35;
       intents.hover(...ndc(e));
     } else if (pts.size === 2) {
       const d = spread();
@@ -63,6 +75,7 @@ export function attachPointer(el: HTMLElement, intents: Intents) {
     if (!p || pts.size > 0) return;
     const moved = Math.hypot(e.clientX - p.sx, e.clientY - p.sy);
     if (moved < CLICK_PX && performance.now() - p.t < CLICK_MS) intents.select(...ndc(e));
+    else if (performance.now() - p.lt < 80) intents.fling(p.vy, p.vp); // released while still moving
   };
   const wheel = (e: WheelEvent) => {
     e.preventDefault();

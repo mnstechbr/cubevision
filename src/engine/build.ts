@@ -59,8 +59,11 @@ export class Lines {
     return this;
   }
 
-  get count() {
-    return this.p.length / 6;
+  /** Raw segment pairs (for `strokes`); clears the builder. */
+  positions() {
+    const a = new Float32Array(this.p);
+    this.p = [];
+    return a;
   }
 
   geometry() {

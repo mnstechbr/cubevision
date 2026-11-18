@@ -22,6 +22,15 @@ export function samplePoints(root: Object3D, count: number, out: Float32Array) {
       cloudTotal += pts.length / 3;
       return;
     }
+    const raw = o.userData.segments as Float32Array | undefined;
+    if (raw) {
+      for (let i = 0; i + 5 < raw.length; i += 6) {
+        a.fromArray(raw, i).applyMatrix4(o.matrixWorld);
+        b.fromArray(raw, i + 3).applyMatrix4(o.matrixWorld);
+        segs.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
+      return;
+    }
     if (!(o as { isLineSegments?: boolean }).isLineSegments) return;
     const geo = (o as unknown as { geometry: { attributes: { position: BufferAttribute }; index: BufferAttribute | null } }).geometry;
     const pos = geo.attributes.position;

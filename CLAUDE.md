@@ -52,17 +52,18 @@ Fluxo: **câmera → MediaPipe (21 pontos por mão) → filtro de suavização �
 
 | Gesto | Ação |
 |---|---|
-| Mover a mão (centro da palma) | Move o cursor; sozinho nunca gira o mundo |
-| Cursor perto da borda da tela | Gira o mundo para aquele lado |
-| Cursor parado no ponto que brilha (~1 s) | Mergulha |
-| Pinça e arrastar *(bônus, quando a pinça é lida)* | Gira o mundo |
+| Mão aberta | Só mostra onde a mão está (acende o alvo embaixo dela) |
+| **Fechar a mão e mover** | Agarra o holograma: ele gira junto com a mão |
+| Abrir a mão | Solta; o mundo continua girando com inércia |
+| Duas mãos fechadas, juntas | Mover gira, torcer inclina, afastar aproxima |
+| **Duas mãos fechadas sobre o alvo, afastando** | Rasga o alvo e mergulha (nada mergulha sozinho) |
 
-> Revisado em 2026-11-18 após teste real com webcam: gestos que dependem da pose dos dedos (pinça, punho, duas mãos) falharam demais. O esquema atual só precisa que a mão seja vista.
+> Histórico (2026-11-18): pinça, "parar em cima" (dwell) e cursor nas bordas foram testados com webcam real e rejeitados: frágeis ou com cara de mouse. Mão aberta × fechada é o que a webcam lê com mais confiança. Para calibrar com dados reais: `?gravar` salva só os números dos pontos da mão (sem imagem) e `?debug` mostra a leitura ao vivo.
 
 - **Profundidade:** webcam não mede bem a profundidade, então "empurrar" é aproximado pelo **tamanho da mão na imagem**. Os gestos principais não dependem disso.
 - **Suavização:** filtro *One Euro* nos pontos, senão a cena treme junto com a mão.
 - **Feedback imediato:** cursor holográfico da mão sempre visível, que reage antes da ação concluir.
-- **Modo sem câmera (obrigatório):** mouse, trackpad e **toque** pelo mesmo código de *Pointer Events* (arrastar = girar, scroll/pinça de dois dedos = zoom, clique/toque = mergulhar). Muita gente vai negar a câmera e a experiência não pode morrer aí. No celular é o modo padrão.
+- **Modo sem câmera (obrigatório):** mouse, trackpad e **toque** pelo mesmo código de *Pointer Events* (arrastar = girar, soltar em movimento = inércia, scroll/pinça de dois dedos = zoom, clique/toque no alvo = mergulhar). Muita gente vai negar a câmera e a experiência não pode morrer aí. No celular é o modo padrão.
 
 ---
 

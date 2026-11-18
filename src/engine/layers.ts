@@ -36,6 +36,10 @@ export interface Layer {
     /** If set (local axis of `object`), the target only reacts when it faces the camera. */
     facing?: Vector3;
   };
+  /** Brightness before bloom, 0..1 (default 1). Dense worlds lower it so they don't burn to white. */
+  exposure?: number;
+  /** HUD callouts pinned to parts of the world (shown while the world is idle). */
+  labels?: { object: Object3D; pt: string; en: string }[];
   /** Multiplies every material's opacity (0..1). */
   fade: Fade;
   /** Hover/arm highlight of the target (0..1). */
