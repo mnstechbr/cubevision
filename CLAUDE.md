@@ -198,12 +198,12 @@ Cada agente faz só a sua parte. Modelo e esforço conforme a dificuldade real. 
 | Fase | Entrega | Critério para seguir |
 |---|---|---|
 | **0. Kickoff** ✅ | Repo, Vercel, skills, decisões pendentes respondidas | Tudo da seção 10 decidido |
-| **1. Protótipo cinza** | Gestos + modo mouse/toque + 2 camadas com cubos cinza + transição | **A transição convence?** Se não, nada segue |
-| **2. Visual holograma** | Shader wireframe, bloom, partículas, mesa de projeção | Parece holograma de filme |
-| **3. MVP** | Camadas 0 → 3 completas | Roda a 60 FPS na máquina de referência |
-| **4. Loop completo** | Camadas 4 → 7 + loop + revelação final | O loop surpreende |
-| **5. Privacidade e acabamento** | Consentimento, aviso pt/en, headers, versão por toque no celular, reduced motion | Checklist da seção 5 completo |
-| **6. Publicação** | Passada de performance, testes em máquina fraca e celular, link no mnstech.com.br | Checklist da seção 6 completo |
+| **1. Protótipo cinza** ✅ | Gestos + modo mouse/toque + 2 camadas com cubos cinza + transição | **A transição convence?** Se não, nada segue |
+| **2. Visual holograma** ✅ | Shader wireframe, bloom, partículas, mesa de projeção | Parece holograma de filme |
+| **3. MVP** ✅ | Camadas 0 → 3 completas | Roda a 60 FPS na máquina de referência |
+| **4. Loop completo** ✅ | Camadas 4 → 7 + loop + revelação final | O loop surpreende |
+| **5. Privacidade e acabamento** ✅ | Consentimento, aviso pt/en, headers, versão por toque no celular, reduced motion | Checklist da seção 5 completo |
+| **6. Publicação** 🔄 | Passada de performance, testes em máquina fraca e celular, link no mnstech.com.br | Checklist da seção 6 completo |
 
 ---
 
@@ -219,7 +219,41 @@ Cada agente faz só a sua parte. Modelo e esforço conforme a dificuldade real. 
 
 ---
 
-## 11. Regras de trabalho
+## 11. Estado atual (2026-11-18)
+
+### Rodar
+
+```bash
+npm install          # também copia o WASM do MediaPipe para public/mediapipe
+npm run dev          # http://localhost:5173
+npm test             # filtro One Euro, gestos, os 6 mundos e o loop completo de mergulhos
+npm run build && npm run preview   # build de produção com os mesmos headers (CSP) da Vercel
+```
+
+Parâmetros de depuração: `?debug` (FPS, draw calls, estado; expõe `window.cv`), `?q=0..3` (fixa a qualidade), `?layer=city` (começa num mundo), `?lang=en`.
+
+### Mapa do código
+
+| Pasta | O quê |
+|---|---|
+| `src/engine/layers.ts` | Contrato da camada, ordem do loop, carregamento por chunk |
+| `src/engine/dive.ts` | Máquina de estados do mergulho, reset de escala, revelação final |
+| `src/engine/orbit.ts` | Câmera orbital amortecida; `rebase()` é o floating origin |
+| `src/engine/particles.ts` | Pool único de partículas, morph na GPU |
+| `src/engine/holo.ts`, `stage.ts` | Materiais de holograma (TSL), bloom, scanlines, qualidade adaptativa |
+| `src/layers/*.ts` | Os 6 mundos procedurais (oficina, cidade, sala, máquina, cristal, galáxia) |
+| `src/input/` | Mouse/toque/teclado, gestos, One Euro, worker do MediaPipe |
+
+### Pendências
+
+- [ ] **CNPJ da MNS Tech** no Aviso de Privacidade (`privacidade.html`, marcado com TODO).
+- [ ] **Logotipo real** da MNS Tech na revelação: hoje as partículas formam o texto "MNS TECH" (`src/engine/text.ts`). Trocar por amostragem do SVG do logo.
+- [ ] Testar **gestos com webcam real** e **WebGPU** numa GPU de verdade (o navegador do agente só tinha WebGL2 e nenhuma câmera).
+- [ ] Gesto de **punho para voltar** uma camada: adiado (o loop só avança).
+- [ ] Geração procedural roda na thread principal (cada mundo leva poucos ms); mover para Worker se passar de ~16 ms.
+- [ ] `knip` no CI e link no mnstech.com.br.
+
+## 12. Regras de trabalho
 
 - **Perguntar antes de construir:** mostrar o que vai fazer em cada fase e esperar concordância.
 - Respostas curtas; processos explicados em fluxo: **de onde vem → para onde vai → por quê**.
