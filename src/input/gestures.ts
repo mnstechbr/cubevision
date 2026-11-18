@@ -21,6 +21,7 @@ interface Slot {
 
 const PINCH_IN = 0.32; // thumb–index gap / hand size
 const PINCH_OUT = 0.5; // hysteresis: harder to leave than to enter
+const FIST = 0.85; // index tip / middle joint distance from the wrist; lenient so real pinches pass
 const HOLD_DELAY = 150; // ms before a held pinch starts counting as "open it"
 const HOLD_TIME = 900; // ms of held pinch to dive with one hand
 const SPREAD = 0.15; // extra palm distance (image widths) for the two-hand dive
@@ -30,6 +31,9 @@ const PITCH_GAIN = 2.4;
 // of the frame is tiring and tracking drops there.
 const REACH = 0.15;
 const reach = (v: number) => Math.min(1, Math.max(0, (v - REACH) / (1 - 2 * REACH)));
+
+/** Last hand's raw measurements, shown with ?debug to calibrate against a real camera. */
+export const metrics = { text: '' };
 
 /**
  * Is the hand at a comfortable distance? Wrist → middle knuckle, in image heights:
@@ -126,13 +130,17 @@ export class Gestures {
 
     const size = Math.max(dist(0, 9), 1e-4);
     const gap = dist(4, 8) / size;
-    // In a fist the thumb also lands on the index; it is not a pinch.
-    const curled = (tip: number) => dist(tip, 9) < size * 0.6;
-    const fist = curled(8) && curled(12);
+    // In a fist the thumb also lands on the index, but the index tip folds back into the
+    // palm (clearly closer to the wrist than its middle joint). In a pinch it reaches forward.
+    // Measured in 3D: a pinching index bends toward the camera, which a 2D view hides.
+    const d3 = (i: number, j: number) => Math.hypot(L[i * 3] - L[j * 3], L[i * 3 + 1] - L[j * 3 + 1], L[i * 3 + 2] - L[j * 3 + 2]);
+    const reachOut = d3(8, 0) / Math.max(d3(6, 0), 1e-4);
+    const fist = reachOut < FIST;
     const wasPinching = slot.pinching;
     slot.pinching = !fist && (wasPinching ? gap < PINCH_OUT : gap < PINCH_IN);
     const pinchStarted = slot.pinching && !wasPinching;
     if (pinchStarted) slot.pinchAt = t;
+    metrics.text = `gap ${gap.toFixed(2)} (pinch <${PINCH_IN}) · reach ${reachOut.toFixed(2)} (fist <${FIST}) · ${fist ? 'fist' : slot.pinching ? 'pinch' : 'open'}`;
 
     const cx = reach(slot.cx.filter((X(4) + X(8)) / 2, t));
     const cy = reach(slot.cy.filter((Y(4) + Y(8)) / 2, t));

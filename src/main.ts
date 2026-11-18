@@ -10,6 +10,7 @@ import { textPoints } from './engine/text';
 import { Vector3 } from 'three/webgpu';
 import { i18n } from './i18n';
 import type { HandsSession } from './input/hands';
+import { metrics as handMetrics } from './input/gestures';
 import { attachPointer, type Intents } from './input/pointer';
 import { ui } from './ui';
 
@@ -174,7 +175,7 @@ async function boot() {
       fpsFrames++;
       if (fpsAcc > 0.5) {
         const info = renderer.info.render;
-        fpsEl.textContent = `${Math.round(fpsFrames / fpsAcc)} fps · q${governor.level} · ${info.drawCalls} draws · ${cur.id} · ${dive.state}`;
+        fpsEl.textContent = `${Math.round(fpsFrames / fpsAcc)} fps · q${governor.level} · ${info.drawCalls} draws · ${cur.id} · ${dive.state}${hands ? `\n${handMetrics.text}` : ''}`;
         fpsAcc = 0;
         fpsFrames = 0;
       }

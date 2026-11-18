@@ -9,7 +9,7 @@ function hand(label: string, cx: number, cy: number, pinch = false, fist = false
   for (const [mcp, pip, tip, dx] of [[5, 6, 8, -0.04], [9, 10, 12, 0], [13, 14, 16, 0.03], [17, 18, 20, 0.06]]) {
     p[mcp] = [cx + dx, cy];
     p[pip] = [cx + dx, cy - 0.05];
-    p[tip] = fist ? [cx + dx, cy - 0.02] : [cx + dx, cy - 0.12];
+    p[tip] = fist ? [cx + dx, cy] : [cx + dx, cy - 0.12];
   }
   p[4] = pinch || fist ? [p[8][0], p[8][1]] : [cx - 0.12, cy - 0.02];
   const lm = new Float32Array(63);
@@ -83,6 +83,18 @@ describe('Gestures', () => {
     for (let i = 0; i < 12; i++) g.update([hand('Left', 0.4 - i * 0.02, 0.5), hand('Right', 0.6 + i * 0.02, 0.5)], i * 33);
     expect(intents.zoom).not.toHaveBeenCalled();
     expect(intents.rotate).not.toHaveBeenCalled();
+  });
+
+  it('a real pinch counts: index bent toward the camera, other fingers curled', () => {
+    const { g, intents } = setup(false);
+    g.update([hand('Right', 0.5, 0.5)], 0);
+    const pinch = hand('Right', 0.5, 0.5, true);
+    const L = pinch.landmarks;
+    for (const [tip] of [[12], [16], [20]]) L[tip * 3 + 1] = 0.5; // middle, ring, pinky curled
+    L.set([0.46, 0.46, -0.08], 8 * 3); // index tip forward, near its middle joint in 2D
+    L.set([0.46, 0.46, -0.08], 4 * 3); // thumb tip on it
+    for (let i = 1; i < 5; i++) g.update([pinch], i * 33);
+    expect(intents.select).toHaveBeenCalledTimes(1);
   });
 
   it('a fist is not a pinch', () => {
