@@ -1,5 +1,5 @@
 import type { Cursor } from '../ui';
-import { Gestures, type HandFrame } from './gestures';
+import { Gestures, handDistance, type HandFrame } from './gestures';
 import type { Intents } from './pointer';
 
 export interface HandsSession {
@@ -10,7 +10,11 @@ export interface HandsSession {
 
 interface Options {
   video: HTMLVideoElement;
+  /** Drawn over the preview: what the tracker sees, so people can tell why it misses. */
+  skeleton: HTMLCanvasElement;
   intents: Intents;
+  /** Coaching: the hand is too close to or too far from the camera. */
+  onDistance(d: 'close' | 'far'): void;
   armed: () => boolean;
   onCursors(c: Cursor[]): void;
   onProgress(p: number): void;
@@ -31,7 +35,8 @@ function timeout<T>(p: Promise<T>, ms: number, what: string) {
 const openCamera = () =>
   timeout(
     navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user', frameRate: { ideal: 30 } },
+      // 16:9 is wider than 4:3 on most webcams (more room for the hands) and matches the screen.
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 }, facingMode: 'user', frameRate: { ideal: 30 } },
       audio: false,
     }),
     CAMERA_TIMEOUT,
@@ -86,6 +91,13 @@ export async function startHands(o: Options): Promise<HandsSession> {
   video.srcObject = stream;
   await video.play();
   video.classList.add('on');
+  const sk = o.skeleton;
+  sk.width = 320;
+  sk.height = Math.round((320 * video.videoHeight) / Math.max(1, video.videoWidth));
+  sk.classList.add('on');
+  const g = sk.getContext('2d')!;
+  const aspect = video.videoWidth / Math.max(1, video.videoHeight);
+  let lastCoach = 0;
 
   const gestures = new Gestures(o.intents, o.armed);
   let busy = false;
@@ -97,6 +109,12 @@ export async function startHands(o: Options): Promise<HandsSession> {
     busy = false;
     const hands = e.data.hands as HandFrame[];
     o.onCursors(gestures.update(hands, e.data.t));
+    drawSkeleton(g, sk.width, sk.height, hands);
+    const d = hands[0] && handDistance(hands[0].landmarks, aspect);
+    if (d && e.data.t - lastCoach > 4000) {
+      lastCoach = e.data.t;
+      o.onDistance(d);
+    }
   };
 
   // Backpressure: one frame in flight at a time, so a slow machine drops frames instead of lagging.
@@ -104,7 +122,8 @@ export async function startHands(o: Options): Promise<HandsSession> {
     if (stopped) return;
     if (!busy && !paused && video.readyState >= 2) {
       busy = true;
-      createImageBitmap(video)
+      // The tracker works at ~224 px anyway: a small frame is cheaper to copy and send.
+      createImageBitmap(video, { resizeWidth: 640, resizeHeight: Math.round((640 * video.videoHeight) / Math.max(1, video.videoWidth)), resizeQuality: 'low' })
         .then((bitmap) => worker.postMessage({ type: 'frame', bitmap, t: performance.now() }, [bitmap]))
         .catch(() => (busy = false));
     }
@@ -124,12 +143,14 @@ export async function startHands(o: Options): Promise<HandsSession> {
       release();
       worker.terminate();
       video.classList.remove('on');
+      sk.classList.remove('on');
       o.onCursors([]);
     },
     // Hidden tab: the camera is really turned off (light goes out), not just ignored.
     pause() {
       paused = true;
       release();
+      g.clearRect(0, 0, sk.width, sk.height);
       o.onCursors([]);
     },
     async resume() {
@@ -142,4 +163,22 @@ export async function startHands(o: Options): Promise<HandsSession> {
       if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(pump);
     },
   };
+}
+
+const BONES = [0, 1, 1, 2, 2, 3, 3, 4, 0, 5, 5, 6, 6, 7, 7, 8, 5, 9, 9, 10, 10, 11, 11, 12, 9, 13, 13, 14, 14, 15, 15, 16, 13, 17, 17, 18, 18, 19, 19, 20, 0, 17];
+
+function drawSkeleton(g: CanvasRenderingContext2D, w: number, h: number, hands: HandFrame[]) {
+  g.clearRect(0, 0, w, h);
+  g.lineWidth = 2;
+  g.strokeStyle = '#3fe8ff';
+  g.fillStyle = '#ffa63d';
+  for (const { landmarks: L } of hands) {
+    g.beginPath();
+    for (let i = 0; i < BONES.length; i += 2) {
+      g.moveTo(L[BONES[i] * 3] * w, L[BONES[i] * 3 + 1] * h);
+      g.lineTo(L[BONES[i + 1] * 3] * w, L[BONES[i + 1] * 3 + 1] * h);
+    }
+    g.stroke();
+    for (const tip of [4, 8]) g.fillRect(L[tip * 3] * w - 3, L[tip * 3 + 1] * h - 3, 6, 6);
+  }
 }

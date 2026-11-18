@@ -32,6 +32,15 @@ const REACH = 0.15;
 const reach = (v: number) => Math.min(1, Math.max(0, (v - REACH) / (1 - 2 * REACH)));
 
 /**
+ * Is the hand at a comfortable distance? Wrist → middle knuckle, in image heights:
+ * about 0.2 at arm's length on a typical webcam.
+ */
+export function handDistance(L: Float32Array, aspect: number): 'close' | 'far' | null {
+  const size = Math.hypot((L[0] - L[27]) * aspect, L[1] - L[28]);
+  return size > 0.34 ? 'close' : size < 0.08 ? 'far' : null;
+}
+
+/**
  * Landmarks → intents. Pure logic (no DOM, no camera), so it is unit-tested.
  * One hand: the hand only points (so aiming never moves the world); pinch on the target
  * and hold to dive; pinch elsewhere and drag to turn the world.

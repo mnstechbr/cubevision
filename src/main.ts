@@ -230,6 +230,8 @@ async function boot() {
       const { startHands } = await import('./input/hands');
       hands = await startHands({
         video: ui.$<HTMLVideoElement>('#cam'),
+        skeleton: ui.$<HTMLCanvasElement>('#cam-skeleton'),
+        onDistance: (d) => ui.toast(d === 'close' ? i18n.t.handClose : i18n.t.handFar, 3000),
         intents,
         armed: () => dive.state === 'armed',
         onCursors: ui.cursors,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Gestures, type HandFrame } from './gestures';
+import { Gestures, handDistance, type HandFrame } from './gestures';
 import type { Intents } from './pointer';
 
 /** A plausible hand centered at (cx, cy) in image space; `pinch` touches thumb and index tips. */
@@ -75,5 +75,19 @@ describe('Gestures', () => {
     const factors = vi.mocked(free.intents.zoom).mock.calls.map((c) => c[0]);
     expect(factors.some((f) => f < 1)).toBe(true);
     expect(free.intents.expand).not.toHaveBeenCalled();
+  });
+});
+
+describe('handDistance', () => {
+  it('coaches a hand that fills the frame or is tiny, and is quiet at arm length', () => {
+    const at = (size: number) => {
+      const L = new Float32Array(63);
+      L.set([0.5, 0.5 + size, 0], 0); // wrist
+      L.set([0.5, 0.5, 0], 27); // middle knuckle (landmark 9)
+      return handDistance(L, 16 / 9);
+    };
+    expect(at(0.45)).toBe('close');
+    expect(at(0.05)).toBe('far');
+    expect(at(0.2)).toBeNull();
   });
 });
