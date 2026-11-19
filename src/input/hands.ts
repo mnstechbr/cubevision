@@ -10,7 +10,7 @@ export interface HandsSession {
   recording(): string | null;
   stop(): void;
   pause(): void;
-  resume(): void;
+  resume(): Promise<void>;
 }
 
 interface Options {
@@ -141,14 +141,14 @@ async function fetchAssets(onProgress: (p: number) => void) {
       for (;;) {
         const { done: end, value } = await reader.read();
         if (end) break;
-        chunks.push(value);
+        if (i === 0) chunks.push(value); // only the model is kept; the WASM is read just to warm the cache
         done[i] += value.byteLength;
         report();
       }
-      return new Blob(chunks as BlobPart[]).arrayBuffer();
+      return i === 0 ? new Blob(chunks as BlobPart[]).arrayBuffer() : null;
     }),
   );
-  return bodies[0];
+  return bodies[0]!;
 }
 
 export async function startHands(o: Options): Promise<HandsSession> {
@@ -241,7 +241,13 @@ export async function startHands(o: Options): Promise<HandsSession> {
     },
     async resume() {
       if (stopped || !paused) return;
-      stream = await openCamera();
+      const fresh = await openCamera();
+      // Turned off (or hidden again) while the camera was reopening: don't leave it on.
+      if (stopped || document.hidden) {
+        fresh.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream = fresh;
       video.srcObject = stream;
       await video.play();
       paused = false;

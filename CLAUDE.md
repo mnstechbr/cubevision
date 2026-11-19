@@ -264,10 +264,11 @@ Parâmetros de depuração: `?debug` (FPS, draw calls, estado; expõe `window.cv
 
 ### Pendências
 
-- [ ] **CNPJ da MNS Tech** no Aviso de Privacidade (`privacidade.html`, marcado com TODO).
-- [ ] **Logotipo real** da MNS Tech na revelação: hoje as partículas formam o texto "MNS TECH" (`src/engine/text.ts`). Trocar por amostragem do SVG do logo.
-- [ ] Testar **gestos com webcam real** e **WebGPU** numa GPU de verdade (o navegador do agente só tinha WebGL2 e nenhuma câmera).
-- [ ] Gesto de **punho para voltar** uma camada: adiado (o loop só avança).
+- [x] **CNPJ da MNS Tech** no Aviso de Privacidade (69.668.730/0001-61, mesma redação da Quitéria).
+- [ ] **Logotipo da MNS Tech** na revelação: o logo ainda não existe (o dono vai criar). Hoje as partículas formam o texto "MNS TECH" (`src/engine/text.ts`); quando houver o SVG, amostrar o contorno dele.
+- [x] Gestos com webcam real: calibrados com duas gravações do dono e aprovados por ele ("agora ficou bom").
+- [ ] Testar **WebGPU** numa GPU de verdade e o **celular** num aparelho real (só emulação até agora).
+- [ ] Ativar **Speed Insights** e **Web Analytics** no painel da Vercel (projeto cubevision).
 - [ ] Geração procedural roda na thread principal (cada mundo leva poucos ms); mover para Worker se passar de ~16 ms.
 - [ ] `knip` no CI e link no mnstech.com.br.
 

@@ -62,7 +62,7 @@ async function boot() {
       stage.setQuality(level);
       particles.setCount(Math.round(particles.max * PARTICLES[level]));
     },
-    params.has('q') ? Number(params.get('q')) : touchFirst ? 2 : 0,
+    params.has('q') ? Math.min(3, Math.max(0, Number(params.get('q')) | 0)) : touchFirst ? 2 : 0,
   );
   if (params.has('q')) governor.tick = () => {}; // debug: pin the quality level
   const ctx = () => ({ detail: DETAIL[governor.level], reducedMotion });
@@ -226,7 +226,11 @@ async function boot() {
     } else {
       last = performance.now();
       renderer.setAnimationLoop(frame);
-      hands?.resume();
+      // Permission revoked or camera gone while hidden: end the session cleanly instead of pretending.
+      hands?.resume().catch(() => {
+        cameraOff();
+        ui.toast(i18n.t.camDenied);
+      });
     }
   });
 
@@ -265,10 +269,14 @@ async function boot() {
   goCamera.addEventListener('click', () => begin(true));
   goMouse.addEventListener('click', () => begin(false));
 
+  // Only one camera session at a time: a double click must not open a second, unstoppable one.
+  let startingCamera = false;
   async function startCamera() {
+    if (startingCamera || hands) return;
+    startingCamera = true;
     ui.toast(i18n.t.loadingHands, 0);
     try {
-      hands = await startHands({
+      const session = await startHands({
         video: ui.$<HTMLVideoElement>('#cam'),
         skeleton: ui.$<HTMLCanvasElement>('#cam-skeleton'),
         onDistance: (d) => ui.toast(d === 'close' ? i18n.t.handClose : i18n.t.handFar, 3000),
@@ -282,6 +290,8 @@ async function boot() {
         },
         onProgress: (p) => ui.toast(`${i18n.t.loadingHands} ${Math.round(p * 100)}%`, 0),
       });
+      hands = session;
+      if (document.hidden) session.pause(); // the tab was hidden while it loaded: camera off
       ui.toast('', 1);
       ui.hint('hintHands', 0); // stays until the first dive
       camToggle.hidden = false;
@@ -295,7 +305,19 @@ async function boot() {
       hands = null;
       ui.toast(i18n.t.camDenied);
       pointerHint();
+    } finally {
+      startingCamera = false;
     }
+  }
+
+  function cameraOff() {
+    hands?.stop();
+    hands = null;
+    reticle.classList.remove('on');
+    guide.hidden = true;
+    ui.cursors([]);
+    setCamLabel(false);
+    pointerHint();
   }
 
   // ?gravar: a button that saves the recorded hand points as a file, to calibrate the gestures.
@@ -319,19 +341,7 @@ async function boot() {
     camToggle.textContent = on ? i18n.t.cameraOff : i18n.t.cameraOn;
     camToggle.setAttribute('aria-pressed', String(on));
   }
-  camToggle.addEventListener('click', () => {
-    if (hands) {
-      hands.stop();
-      hands = null;
-      reticle.classList.remove('on');
-      guide.hidden = true;
-      ui.cursors([]);
-      setCamLabel(false);
-      pointerHint();
-    } else {
-      void startCamera();
-    }
-  });
+  camToggle.addEventListener('click', () => (hands ? cameraOff() : void startCamera()));
   i18n.onChange(() => setCamLabel(!!hands));
   ui.$('#lang-toggle').addEventListener('click', () => i18n.toggle());
 }
