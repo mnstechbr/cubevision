@@ -59,6 +59,56 @@ export class Lines {
     return this;
   }
 
+  /**
+   * A person in wireframe, for human scale. Feet at (x, y, z), `h` tall (1.75 ≈ an adult when the
+   * world's unit is a metre), facing `facing` radians around Y. Poses: standing, sitting, walking.
+   */
+  person(x: number, y: number, z: number, h = 1.75, facing = 0, pose: 'stand' | 'sit' | 'walk' = 'stand') {
+    const c = Math.cos(facing);
+    const s = Math.sin(facing);
+    const u = h / 1.75;
+    // Local (right, up, forward) in metres → world.
+    const P = (r: number, up: number, f: number): [number, number, number] => [x + (r * c + f * s) * u, y + up * u, z + (-r * s + f * c) * u];
+    const seg = (a: [number, number, number], b: [number, number, number]) => this.seg(...a, ...b);
+    const sit = pose === 'sit';
+    const hip = sit ? 0.48 : 0.95;
+    const neck = hip + 0.58;
+    const head = neck + 0.13;
+    // Head (two rings) and body.
+    for (let i = 0; i < 10; i++) {
+      const a0 = (i / 10) * Math.PI * 2;
+      const a1 = ((i + 1) / 10) * Math.PI * 2;
+      seg(P(Math.cos(a0) * 0.1, head + Math.sin(a0) * 0.12, 0), P(Math.cos(a1) * 0.1, head + Math.sin(a1) * 0.12, 0));
+      seg(P(0, head + Math.sin(a0) * 0.12, Math.cos(a0) * 0.1), P(0, head + Math.sin(a1) * 0.12, Math.cos(a1) * 0.1));
+    }
+    seg(P(0, neck, 0), P(0, hip, 0));
+    seg(P(-0.2, neck - 0.05, 0), P(0.2, neck - 0.05, 0)); // shoulders
+    seg(P(-0.13, hip, 0), P(0.13, hip, 0)); // hips
+    const swing = pose === 'walk' ? 0.22 : 0;
+    // Arms.
+    for (const side of [-1, 1]) {
+      const sh = P(side * 0.2, neck - 0.05, 0);
+      const el = sit ? P(side * 0.24, neck - 0.32, 0.18) : P(side * 0.24, neck - 0.33, side * swing * 0.6);
+      const hand = sit ? P(side * 0.2, neck - 0.4, 0.42) : P(side * 0.25, neck - 0.62, side * swing);
+      seg(sh, el);
+      seg(el, hand);
+    }
+    // Legs.
+    for (const side of [-1, 1]) {
+      const hp = P(side * 0.13, hip, 0);
+      if (sit) {
+        const knee = P(side * 0.14, hip, 0.45);
+        seg(hp, knee);
+        seg(knee, P(side * 0.14, 0, 0.48));
+      } else {
+        const knee = P(side * 0.13, hip * 0.5, -side * swing * 0.5);
+        seg(hp, knee);
+        seg(knee, P(side * 0.13, 0, -side * swing));
+      }
+    }
+    return this;
+  }
+
   /** Raw segment pairs (for `strokes`); clears the builder. */
   positions() {
     const a = new Float32Array(this.p);

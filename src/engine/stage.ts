@@ -66,6 +66,8 @@ export async function createStage(canvas: HTMLCanvasElement, reducedMotion: bool
       const h = window.innerHeight;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
+      // Portrait phones: widen the vertical field of view so the sideways view stays ~40°.
+      camera.fov = Math.max(50, (2 * Math.atan(Math.tan((20 * Math.PI) / 180) / camera.aspect) * 180) / Math.PI);
       camera.updateProjectionMatrix();
     },
   };

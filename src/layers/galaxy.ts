@@ -275,6 +275,7 @@ export function create(ctx: LayerContext): Layer {
 
   return {
     id: 'galaxy',
+    caption: { pt: 'Dentro do cristal, uma galáxia. Uma das estrelas não é uma estrela.', en: 'Inside the crystal, a galaxy. One of the stars is not a star.' },
     root,
     fade,
     glow: hover,

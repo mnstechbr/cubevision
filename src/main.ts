@@ -100,6 +100,7 @@ async function boot() {
     next: () => next,
     arrived(layer) {
       next = null;
+      ui.caption(layer.id, layer.caption);
       if (hands) ui.hint(null);
       ui.layer(layer.id);
       if (layer.id === 'table') {
@@ -237,6 +238,7 @@ async function boot() {
   const camToggle = ui.$<HTMLButtonElement>('#cam-toggle');
   if (!canCamera) {
     goCamera.hidden = true;
+    ui.$('#entry .note').hidden = true; // no camera here: nothing to reassure about
     goMouse.dataset.t = touchFirst ? 'useTouch' : 'useMouse';
     goMouse.classList.add('primary');
     ui.applyTexts();
@@ -252,6 +254,7 @@ async function boot() {
     attachPointer(canvas, intents);
     canvas.focus();
     dive.intro();
+    setTimeout(() => ui.caption(host.current.id, host.current.caption), 900);
     preload(nextOf(first.id));
     if (withCamera) void startCamera();
     else pointerHint();

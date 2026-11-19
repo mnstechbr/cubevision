@@ -36,6 +36,8 @@ export interface Layer {
     /** If set (local axis of `object`), the target only reacts when it faces the camera. */
     facing?: Vector3;
   };
+  /** Shown big on arrival under the layer name: what this place is and what to look for. */
+  caption?: { pt: string; en: string };
   /** Brightness before bloom, 0..1 (default 1). Dense worlds lower it so they don't burn to white. */
   exposure?: number;
   /** HUD callouts pinned to parts of the world (shown while the world is idle). */

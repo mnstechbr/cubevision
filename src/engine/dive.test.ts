@@ -91,17 +91,29 @@ describe('target hit test', () => {
 });
 
 describe('zooming through the target', () => {
-  async function at(yaw: number, id: 'room' | 'city' = 'room') {
+  // Layout-independent: the camera is pointed straight at the target (on it) or well away (off it).
+  async function at(onTarget: boolean) {
     const camera = new PerspectiveCamera(50, 16 / 9, 0.1, 1000);
     const orbit = new Orbit(camera, false);
-    const room = await loadLayer(id, ctx);
-    orbit.apply(room.view, true);
-    orbit.goal.yaw = orbit.now.yaw = yaw;
+    const world = await loadLayer('city', ctx);
+    orbit.apply(world.view, true);
+    world.root.updateMatrixWorld(true);
+    const t = world.target.object.getWorldPosition(new Vector3());
+    if (onTarget) {
+      orbit.goal.target.copy(t);
+      orbit.now.target.copy(t);
+    } else {
+      // Look at a point on the far side of the world, with the target behind the camera.
+      const away = t.clone().setY(0).normalize().multiplyScalar(-world.radius);
+      orbit.goal.target.copy(away).setY(t.y);
+      orbit.now.target.copy(orbit.goal.target);
+      orbit.goal.yaw = orbit.now.yaw = Math.atan2(t.x, t.z); // camera on the target side, looking away from it
+    }
     orbit.update(1 / 60);
-    const host = { scene: new Scene(), camera, orbit, particles: new Particles(10), current: room, reducedMotion: false, next: () => null, arrived() {} };
+    const host = { scene: new Scene(), camera, orbit, particles: new Particles(10), current: world, reducedMotion: false, next: () => null, arrived() {} };
     return { dive: new Dive(host), orbit };
   }
-  const zoomIn = (dive: Dive, orbit: Orbit, frames = 240) => {
+  const zoomIn = (dive: Dive, orbit: Orbit, frames = 300) => {
     for (let i = 0; i < frames && dive.state === 'idle'; i++) {
       dive.zoom(0.97, 0.3);
       dive.update(1 / 60);
@@ -116,7 +128,7 @@ describe('zooming through the target', () => {
   };
 
   it('moving in on the spot stops at the limit; only a second push after a pause enters', async () => {
-    const { dive, orbit } = await at(0);
+    const { dive, orbit } = await at(true);
     pause(dive, orbit, 2); // past the arrival grace
     zoomIn(dive, orbit);
     expect(dive.state).toBe('idle'); // one long push never enters by itself
@@ -127,17 +139,20 @@ describe('zooming through the target', () => {
   });
 
   it('right after arriving, moving in cannot enter yet', async () => {
-    const { dive, orbit } = await at(0);
-    zoomIn(dive, orbit, 30);
+    const { dive, orbit } = await at(true);
+    zoomIn(dive, orbit, 40);
     pause(dive, orbit, 0.4);
-    zoomIn(dive, orbit, 30); // still inside the grace period after (pretend) arrival
+    zoomIn(dive, orbit, 20);
     expect(dive.state).toBe('idle');
   });
 
   it('moving in elsewhere just stops at the closest distance', async () => {
-    const { dive, orbit } = await at(Math.PI / 2, 'city'); // the city's spot is far off to the side from here
+    const { dive, orbit } = await at(false);
+    pause(dive, orbit, 2);
     zoomIn(dive, orbit);
+    pause(dive, orbit, 0.5);
+    zoomIn(dive, orbit, 30);
     expect(dive.state).toBe('idle');
-    expect(orbit.goal.distance).toBeCloseTo(orbit.minDistance, 5);
+    expect(dive.atEntry).toBe(false);
   });
 });

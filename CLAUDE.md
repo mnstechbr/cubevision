@@ -44,6 +44,19 @@ Não é realista nem cartoon. O detalhe vem da **densidade de linhas e partícul
 - **Revelação final** (ao completar o loop): o cubo se remonta como o **logotipo da MNS Tech em wireframe**, com uma frase curta e link para mnstech.com.br.
 - **MVP:** camadas 0 → 1 → 2 → 3. As demais entram depois de validar a transição.
 
+### Direção de arte dos cenários (revisada em 2026-11-18 após teste do dono)
+
+Regra geral: cada camada é um **lugar completo**, reconhecível de primeira, nunca "um objeto em cima de um pedestal". A câmera chega com um plano de estabelecimento (você vê onde está), o alvo fica **escondido** (nunca de frente para quem chega) e há uma pista visual de longe. Escala humana (silhuetas de pessoas em wireframe) onde fizer sentido. Cada chegada mostra um título: nome do lugar + uma frase do que procurar.
+
+| Camada | Lugar | Elementos obrigatórios | Alvo e pista |
+|---|---|---|---|
+| Oficina | Oficina de inventor, à noite | 4 paredes com janelas (luzes da cidade lá fora), teto com vigas e luminária pendente, bancadas com ferramentas, estantes com peças, quadro com esboços do cubo, braço robótico, cabos no chão, porta, cadeira | Fresta atrás do cubo; luz vazando pelas laterais |
+| Cidade | Metrópole noturna vista do alto | Centro com arranha-céus, bairros residenciais, rio com pontes, porto com guindastes, parque, estádio, trem elevado, trânsito, janelas acesas | Um prédio longe do ponto de chegada; feixe âmbar fraco subindo ao céu |
+| Sala | Andar executivo alto, dentro daquele prédio | Mesas, cadeiras, telas, sala de reunião, plantas, elevador, janelões com a cidade, pessoas trabalhando | Laboratório envidraçado no fundo, com a mesa de projeção e a máquina em holograma |
+| Máquina | Reator gigante num hangar | Piso, paredes, passarelas, escadas, guindaste, andaimes, pessoas minúsculas para escala, turbinas, pistões, engrenagens, tubos | Núcleo visível só por uma abertura lateral |
+| Cristal | Caverna de cristais | Paredes de rocha, estalactites, cristais saindo das paredes e do chão, raios de luz, poeira | Centelha no fundo do cristal principal |
+| Galáxia | Galáxia espiral | (aprovada como está) | Estrela-farol num braço |
+
 ---
 
 ## 3. Gestos

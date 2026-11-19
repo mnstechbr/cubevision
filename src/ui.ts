@@ -14,6 +14,7 @@ export interface Cursor {
 let hintKey: keyof typeof i18n.t | null = null;
 let hintTimer = 0;
 let toastTimer = 0;
+let captionTimer = 0;
 let currentLayer: LayerId | null = null;
 const cursorEls = [...document.querySelectorAll<HTMLElement>('#cursors i')];
 
@@ -55,6 +56,16 @@ export const ui = {
     const name = i18n.t.names[id];
     $('#layer-label').innerHTML = `${i18n.t.layer} ${n} · <b>${name}</b>`;
     $('#scene').setAttribute('aria-label', `${i18n.t.sceneLabel} ${name}`);
+  },
+
+  /** Big arrival title: the place's name and what to look for. */
+  caption(id: LayerId, text?: { pt: string; en: string }) {
+    const el = $('#caption');
+    el.querySelector('b')!.textContent = `${String(ORDER.indexOf(id) + 1).padStart(2, '0')} · ${i18n.t.names[id]}`;
+    el.querySelector('span')!.textContent = text ? (i18n.lang === 'pt' ? text.pt : text.en) : '';
+    el.classList.add('on');
+    clearTimeout(captionTimer);
+    captionTimer = window.setTimeout(() => el.classList.remove('on'), 5000);
   },
 
   hint(key: keyof typeof i18n.t | null, holdMs = 9000) {
