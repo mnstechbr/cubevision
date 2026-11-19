@@ -66,8 +66,8 @@ Fluxo: **câmera → MediaPipe (21 pontos por mão) → filtro de suavização �
 | Gesto (uma mão) | Ação |
 |---|---|
 | Mão **fechada** + arrastar para qualquer lado | Move o mapa (o mundo segue a mão) |
-| Mão **aberta** subindo / descendo | Aproxima / afasta (zoom) |
-| Ponto que brilha na mira + aproximar até o limite, **parar**, aproximar de novo | Entra nele (o mergulho). Nunca entra num movimento só, nem logo ao chegar num mundo |
+| Mão **aberta** levantada um pouco e segurada / abaixada | Continua aproximando / afastando, como um joystick (mais alto = mais rápido) |
+| Ponto que brilha na mira + aproximar até o limite e **continuar segurando ~0,8 s** | Entra nele (a mira enche). Um toque rápido não entra, nem logo ao chegar num mundo |
 | Agarrar e puxar rápido | O leitor perde a mão, mas o mundo continua girando (arremesso) |
 | Abaixar a mão | Descansa (a mão só age depois de parar um instante ao entrar na imagem) |
 

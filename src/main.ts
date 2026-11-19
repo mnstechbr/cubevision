@@ -194,7 +194,8 @@ async function boot() {
       const aimed = dive.state === 'idle' && dive.hits(0, 0, AIM);
       reticle.classList.toggle('aimed', aimed);
       const span = Math.max(1e-3, cur.view.distance - orbit.minDistance);
-      reticle.style.setProperty('--p', aimed ? Math.min(1, Math.max(0, (cur.view.distance - orbit.goal.distance) / span)).toFixed(3) : '0');
+      const closeness = aimed ? Math.min(1, Math.max(0, (cur.view.distance - orbit.goal.distance) / span)) : 0;
+      reticle.style.setProperty('--p', (dive.atEntry ? dive.entryProgress : closeness * 0.6).toFixed(3));
     }
     if (dive.state === 'idle') cur.glow.value += ((hovered ? 0.75 : 0) - cur.glow.value) * Math.min(1, dt * 6);
     cur.update(t, dt);

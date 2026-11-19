@@ -21,7 +21,8 @@ export interface DiveHost {
 
 const smooth = (a: number, b: number, x: number) => MathUtils.smoothstep(x, a, b);
 const UP = new Vector3(0, 1, 0);
-const PAUSE = 0.35; // s without zooming that makes the next push a new one
+const PAUSE = 0.3; // s without moving in that resets the hold at the edge
+const ENTRY_HOLD = 0.8; // s of moving in at the edge that goes through
 const ARRIVAL_GRACE = 1.5; // s after arriving in a world before moving in can enter the next
 
 /**
@@ -41,6 +42,7 @@ export class Dive {
   private clock = 0;
   private lastZoom = -1;
   private atLimitSince = -1;
+  private entryHeld = 0;
   private noEntryUntil = ARRIVAL_GRACE;
   private edge = new Vector3();
   private quat = new Quaternion();
@@ -98,12 +100,14 @@ export class Dive {
         orbit.goal.target.lerp(this.center, Math.min(1, (1 - f) * 3));
       }
       if (orbit.goal.distance <= orbit.minDistance * 1.02) {
-        // Two steps, never by accident: reach the limit, stop, then move in again to enter.
+        // At the edge: keep moving in for a moment to go through (a brief touch doesn't).
         const now = this.clock;
-        const fresh = now - this.lastZoom > PAUSE;
+        const gap = now - this.lastZoom;
         this.lastZoom = now;
-        if (this.atLimitSince < 0) this.atLimitSince = now;
-        else if (fresh && now > this.noEntryUntil) return this.start();
+        if (now < this.noEntryUntil) return;
+        this.atLimitSince = this.atLimitSince < 0 ? now : this.atLimitSince;
+        this.entryHeld = gap > PAUSE ? 0 : this.entryHeld + Math.min(gap, 0.1);
+        if (this.entryHeld >= ENTRY_HOLD) return this.start();
         return;
       }
       this.atLimitSince = -1;
@@ -116,9 +120,14 @@ export class Dive {
     orbit.zoom(f);
   }
 
-  /** At the closest distance, aimed, waiting for a second push to enter. */
+  /** At the closest distance, aimed: keep moving in to enter. */
   get atEntry() {
-    return this.atLimitSince >= 0 && this.state === 'idle';
+    return this.atLimitSince >= 0 && this.state === 'idle' && this.clock - this.lastZoom < PAUSE;
+  }
+
+  /** 0..1 of the hold that goes through the target. */
+  get entryProgress() {
+    return this.atEntry ? Math.min(1, this.entryHeld / ENTRY_HOLD) : 0;
   }
 
   start() {
@@ -327,6 +336,7 @@ export class Dive {
     orbit.locked = false;
     this.state = 'idle';
     this.atLimitSince = -1;
+    this.entryHeld = 0;
     this.noEntryUntil = this.clock + ARRIVAL_GRACE; // just arrived: look around before you can enter again
   }
 }

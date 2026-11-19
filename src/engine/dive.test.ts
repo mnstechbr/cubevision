@@ -127,15 +127,29 @@ describe('zooming through the target', () => {
     }
   };
 
-  it('moving in on the spot stops at the limit; only a second push after a pause enters', async () => {
+  it('moving in on the spot reaches the edge; keeping on for a moment goes through', async () => {
     const { dive, orbit } = await at(true);
     pause(dive, orbit, 2); // past the arrival grace
-    zoomIn(dive, orbit);
-    expect(dive.state).toBe('idle'); // one long push never enters by itself
-    expect(dive.atEntry).toBe(true);
-    pause(dive, orbit, 0.5);
-    zoomIn(dive, orbit, 5);
+    zoomIn(dive, orbit, 300);
     expect(dive.state).toBe('focus');
+  });
+
+  it('a brief touch at the edge does not go through', async () => {
+    const { dive, orbit } = await at(true);
+    pause(dive, orbit, 2);
+    // Move in only until the edge is reached…
+    for (let i = 0; i < 600 && !dive.atEntry && dive.state === 'idle'; i++) {
+      dive.zoom(0.97, 0.3);
+      dive.update(1 / 60);
+      orbit.update(1 / 60);
+    }
+    expect(dive.atEntry).toBe(true);
+    // …then a few short taps (~0.33 s each) with pauses between them.
+    for (let k = 0; k < 5 && dive.state === 'idle'; k++) {
+      pause(dive, orbit, 0.5);
+      zoomIn(dive, orbit, 20);
+    }
+    expect(dive.state).toBe('idle');
   });
 
   it('right after arriving, moving in cannot enter yet', async () => {

@@ -20,7 +20,7 @@ const OPEN_ABOVE = 1.1;
 const SLACK = 0.04; // the hand must move this far (image widths) before the world follows: kills jitter
 const YAW_GAIN = 7; // rad per image width of fist travel: a slow drag turns a lot
 const PITCH_GAIN = 3.5;
-const ZOOM_GAIN = 4.5; // log-distance per image height of open-hand travel (up = in)
+const ZOOM_RATE = 14; // log-distance per second, per image height the open hand is held up (or down)
 const HOLD_MS = 500; // a hand missing for less than this keeps its state: tracking gaps don't drop the grab
 const REACQUIRE_MS = 120; // after a gap this long the tracker's first position can jump: start over from it
 const STILL = 0.012; // a hand that just appeared acts only after it has stopped once (raising it isn't a gesture)
@@ -53,7 +53,7 @@ export function fingerReach(L: Float32Array) {
 /**
  * Landmarks → intents, one hand:
  * - closed hand (grab) + drag, any direction: moves the map (turns the world with the hand);
- * - open hand moved up: move in; moved down: move out (sideways does nothing);
+ * - open hand held a little above where it opened: keeps moving in; below: keeps moving out;
  *   moving in on the glowing spot in the reticle goes through it (the dive, handled by zoom);
  * - lower the hand out of view to rest.
  * The world only follows movement beyond a small slack around the hand, which removes the
@@ -117,8 +117,8 @@ export class Gestures {
     // Each pose has its own starting point: switching pose (or the hand being re-found) starts over.
     if (this.closed !== was || gap > REACQUIRE_MS || !this.anchor) this.anchor = { ...palm };
 
-    if (this.ready) {
-      // Rubber band: the anchor trails the hand by SLACK; only that trailing motion counts.
+    if (this.ready && this.closed) {
+      // Grab: rubber band. The anchor trails the hand by SLACK; only that trailing motion counts.
       const ox = palm.x - this.anchor.x;
       const oy = palm.y - this.anchor.y;
       const d = Math.hypot(ox, oy);
@@ -128,18 +128,23 @@ export class Gestures {
         const my = oy * k;
         this.anchor.x += mx;
         this.anchor.y += my;
-        if (this.closed) {
-          // Grab: the map follows the hand (capped per frame so a tracker hiccup can't jerk it).
-          this.intents.rotate(clamp(mx * YAW_GAIN, MAX_STEP), clamp(my * PITCH_GAIN, MAX_STEP));
-          const dts = Math.max(0.03, Math.min(gap, 200) / 1000);
-          this.vYaw += ((mx * YAW_GAIN) / dts - this.vYaw) * 0.5;
-          this.vPitch += ((my * PITCH_GAIN) / dts - this.vPitch) * 0.5;
-        } else if (Math.abs(my) > Math.abs(mx)) {
-          const f = Math.exp(clamp(my * ZOOM_GAIN, MAX_STEP)); // open hand up (y↓) = in, down = out
-          this.intents.zoom(f);
-          zooming.dir = f < 1 ? 1 : -1;
-          zooming.at = t;
-        }
+        // The map follows the hand (capped per frame so a tracker hiccup can't jerk it).
+        this.intents.rotate(clamp(mx * YAW_GAIN, MAX_STEP), clamp(my * PITCH_GAIN, MAX_STEP));
+        const dts = Math.max(0.03, Math.min(gap, 200) / 1000);
+        this.vYaw += ((mx * YAW_GAIN) / dts - this.vYaw) * 0.5;
+        this.vPitch += ((my * PITCH_GAIN) / dts - this.vPitch) * 0.5;
+      }
+    } else if (this.ready) {
+      // Open hand: a joystick. Held above where it opened it keeps moving in (faster the higher),
+      // below it keeps moving out, near it nothing. No need to re-grab or leave the frame.
+      const oy = palm.y - this.anchor.y;
+      const push = Math.sign(oy) * Math.max(0, Math.abs(oy) - SLACK);
+      if (push !== 0) {
+        const dts = Math.min(Math.max(gap, 16), 200) / 1000;
+        const f = Math.exp(clamp(push * ZOOM_RATE * dts, MAX_STEP)); // up (y↓) = in
+        this.intents.zoom(f);
+        zooming.dir = f < 1 ? 1 : -1;
+        zooming.at = t;
       }
     }
 

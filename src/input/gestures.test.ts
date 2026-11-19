@@ -55,22 +55,34 @@ describe('Gestures (grab with one hand)', () => {
     expect(up.intents.zoom).not.toHaveBeenCalled();
   });
 
-  it('an open hand moved up moves in, down moves out, and never turns the map', () => {
+  it('an open hand held up keeps moving in, held down keeps moving out, and never turns the map', () => {
+    // Opens at y 0.5, rises to 0.4 and stays there: zooming in must continue while it's held.
     const up = setup();
-    run(up.g, (i) => [hand(0.5, 0.7 - i * 0.02)], 20);
+    run(up.g, (i) => [hand(0.5, i < 8 ? 0.5 : 0.4)], 40);
     const inF = vi.mocked(up.intents.zoom).mock.calls.map((c) => c[0]);
-    expect(inF.length).toBeGreaterThan(5);
+    expect(inF.length).toBeGreaterThan(20); // still going after the hand stopped moving
     expect(inF.every((f) => f < 1)).toBe(true);
 
     const down = setup();
-    run(down.g, (i) => [hand(0.5, 0.3 + i * 0.02)], 20);
-    expect(vi.mocked(down.intents.zoom).mock.calls.every((c) => c[0] > 1)).toBe(true);
+    run(down.g, (i) => [hand(0.5, i < 8 ? 0.5 : 0.6)], 40);
+    const outF = vi.mocked(down.intents.zoom).mock.calls.map((c) => c[0]);
+    expect(outF.length).toBeGreaterThan(20);
+    expect(outF.every((f) => f > 1)).toBe(true);
 
     const side = setup();
     run(side.g, (i) => [hand(0.3 + i * 0.02, 0.5)], 20);
     expect(side.intents.zoom).not.toHaveBeenCalled();
     expect(up.intents.rotate).not.toHaveBeenCalled();
     expect(side.intents.rotate).not.toHaveBeenCalled();
+  });
+
+  it('the higher the open hand, the faster it moves in', () => {
+    const rate = (y: number) => {
+      const s = setup();
+      run(s.g, (i) => [hand(0.5, i < 8 ? 0.5 : y)], 30);
+      return vi.mocked(s.intents.zoom).mock.calls.reduce((acc, c) => acc + Math.log(c[0]), 0);
+    };
+    expect(rate(0.35)).toBeLessThan(rate(0.42)); // more negative log = more zoom in
   });
 
   it('a shaky hand that stays put does nothing, open or closed', () => {
