@@ -256,6 +256,11 @@ a:focus-visible {
 #reveal[hidden] {
   display: none;
 }
+#reveal img {
+  width: min(240px, 60vw);
+  height: auto;
+  filter: drop-shadow(0 0 14px rgb(200 255 62 / 0.35));
+}
 #reveal p {
   margin: 0;
   letter-spacing: 0.12em;

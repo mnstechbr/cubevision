@@ -8,7 +8,7 @@ import { ORDER, loadLayer, nextOf, type Layer, type LayerId } from './engine/lay
 import { Orbit } from './engine/orbit';
 import { Particles } from './engine/particles';
 import { createGovernor, createStage } from './engine/stage';
-import { textPoints } from './engine/text';
+import { markPoints } from './engine/text';
 import { Vector3 } from 'three/webgpu';
 import { i18n } from './i18n';
 import { startHands, tracker as trackerInfo, type HandsSession } from './input/hands';
@@ -140,7 +140,7 @@ async function boot() {
     const center = new Vector3(0, host.current.view.height + 0.6, 0);
     const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
     const up = new Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-    textPoints('MNS TECH', particles.max, center, right, up, 5.2, pts);
+    markPoints(particles.max, center, right, up, 5.6, pts);
     dive.reveal(pts, () => {
       revealEl.hidden = false;
       setTimeout(() => (revealEl.hidden = true), 9000);

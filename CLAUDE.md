@@ -265,7 +265,7 @@ Parâmetros de depuração: `?debug` (FPS, draw calls, estado; expõe `window.cv
 ### Pendências
 
 - [x] **CNPJ da MNS Tech** no Aviso de Privacidade (69.668.730/0001-61, mesma redação da Quitéria).
-- [ ] **Logotipo da MNS Tech** na revelação: o logo ainda não existe (o dono vai criar). Hoje as partículas formam o texto "MNS TECH" (`src/engine/text.ts`); quando houver o SVG, amostrar o contorno dele.
+- [x] **Marca MNS Tech** refinada (`brand/`: ">_ mns.tech" em traço único desenhado, versões escura, clara, animada e ícone; `brand/generate.py` gera tudo). As partículas da revelação desenham essa marca (`src/engine/mark.json`).
 - [x] Gestos com webcam real: calibrados com duas gravações do dono e aprovados por ele ("agora ficou bom").
 - [ ] Testar **WebGPU** numa GPU de verdade e o **celular** num aparelho real (só emulação até agora).
 - [ ] Ativar **Speed Insights** e **Web Analytics** no painel da Vercel (projeto cubevision).
