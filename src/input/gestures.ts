@@ -17,7 +17,7 @@ export interface HandFrame {
 // (high gain) and a fast flick that loses the hand keeps the world spinning (the throw).
 const CLOSE_BELOW = 1.0;
 const OPEN_ABOVE = 1.1;
-const SLACK = 0.04; // the hand must move this far (image widths) before the world follows: kills jitter
+const SLACK = 0.025; // the hand must move this far (image widths) before the world follows: kills jitter
 const YAW_GAIN = 7; // rad per image width of fist travel: a slow drag turns a lot
 const PITCH_GAIN = 3.5;
 const ZOOM_RATE = 14; // log-distance per second, per image height the open hand is held up (or down)

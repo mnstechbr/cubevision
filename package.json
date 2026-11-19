@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "postinstall": "mkdir -p public/mediapipe && cp node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_module_internal.* public/mediapipe/",
+    "postinstall": "mkdir -p public/mediapipe && cp node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_module_internal.* node_modules/@mediapipe/tasks-vision/wasm/vision_wasm_internal.* public/mediapipe/",
     "test": "vitest run"
   },
   "devDependencies": {

@@ -476,6 +476,13 @@ a:focus-visible {
   margin: 0 0 8px;
   letter-spacing: 0.06em;
 }
+.hg-fps {
+  font-style: normal;
+  color: var(--dim);
+}
+.hg-fps.slow {
+  color: var(--amber);
+}
 .hg-state b {
   display: none;
   color: var(--ice);

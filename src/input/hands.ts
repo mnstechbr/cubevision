@@ -2,8 +2,8 @@ import type { Cursor } from '../ui';
 import { Gestures, handDistance, type HandFrame } from './gestures';
 import type { Intents } from './pointer';
 
-/** Live tracker diagnostics, shown with ?debug. */
-export const tracker = { text: '' };
+/** Live tracker diagnostics: `fps` is shown in the controls panel, `text` with ?debug. */
+export const tracker = { text: '', fps: 0 };
 
 export interface HandsSession {
   /** With ?gravar: the landmark numbers seen so far as JSON (no images), or null. */
@@ -29,8 +29,88 @@ const MODEL_TIMEOUT = 40_000;
 // Bytes to show real progress even when the server doesn't send Content-Length.
 const ASSETS: [string, number][] = [
   ['/models/hand_landmarker.task', 7_819_105],
-  ['/mediapipe/vision_wasm_module_internal.wasm', 14_000_000],
+  ['/mediapipe/vision_wasm_internal.wasm', 14_665_716],
 ];
+// One hand, and slow to give up on it (same settings in hands.worker.ts).
+const TRACKER = { numHands: 1, minHandDetectionConfidence: 0.4, minHandPresenceConfidence: 0.3, minTrackingConfidence: 0.3 } as const;
+
+type OnHands = (hands: HandFrame[], t: number) => void;
+/** Something that turns video frames into hands. `send` returns false when it is still busy. */
+interface Detector {
+  kind: string;
+  send(video: HTMLVideoElement, t: number): boolean;
+  close(): void;
+}
+
+/**
+ * The fast path, as in Google's own demo: the tracker on the page's thread with the GPU,
+ * reading the <video> directly (no frame copies). Measured ~16 ms/frame vs ~28 ms in a worker.
+ */
+async function pageDetector(model: ArrayBuffer, onHands: OnHands): Promise<Detector> {
+  const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision');
+  const fileset = await FilesetResolver.forVisionTasks(`${location.origin}/mediapipe`);
+  const lm = await HandLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetBuffer: new Uint8Array(model), delegate: 'GPU' },
+    runningMode: 'VIDEO',
+    ...TRACKER,
+  });
+  return {
+    kind: 'GPU',
+    send(video, t) {
+      const r = lm.detectForVideo(video, t);
+      const hands = r.landmarks.map((points, i) => {
+        const l = new Float32Array(63);
+        points.forEach((p, j) => l.set([p.x, p.y, p.z], j * 3));
+        return { label: r.handedness[i]?.[0]?.categoryName ?? String(i), landmarks: l };
+      });
+      onHands(hands, t);
+      return true;
+    },
+    close: () => lm.close(),
+  };
+}
+
+/** Fallback when the GPU path can't start: the tracker in a worker (GPU there if allowed, else CPU). */
+async function workerDetector(model: ArrayBuffer, onHands: OnHands): Promise<Detector> {
+  const worker = new Worker(new URL('./hands.worker.ts', import.meta.url), { type: 'module' });
+  let kind = 'worker';
+  try {
+    await timeout(
+      new Promise<void>((resolve, reject) => {
+        worker.onmessage = (e) => {
+          if (e.data.type !== 'ready') return reject(new Error(e.data.message));
+          kind = `worker ${e.data.delegate}`;
+          resolve();
+        };
+        worker.onerror = (e) => reject(new Error(e.message));
+        worker.postMessage({ type: 'init', model }, [model]);
+      }),
+      MODEL_TIMEOUT,
+      'hand tracker',
+    );
+  } catch (e) {
+    worker.terminate();
+    throw e;
+  }
+  let busy = false;
+  worker.onmessage = (e) => {
+    if (e.data.type !== 'result') return;
+    busy = false;
+    onHands(e.data.hands as HandFrame[], e.data.t);
+  };
+  return {
+    kind,
+    send(video, t) {
+      if (busy) return false;
+      busy = true;
+      createImageBitmap(video, { resizeWidth: 640, resizeHeight: Math.round((640 * video.videoHeight) / Math.max(1, video.videoWidth)) })
+        .then((bitmap) => worker.postMessage({ type: 'frame', bitmap, t }, [bitmap]))
+        .catch(() => (busy = false));
+      return true;
+    },
+    close: () => worker.terminate(),
+  };
+}
 
 function timeout<T>(p: Promise<T>, ms: number, what: string) {
   return Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`${what} timed out`)), ms))]);
@@ -47,7 +127,7 @@ const openCamera = () =>
     'camera',
   );
 
-/** Downloads the model (kept) and the WASM (warms the HTTP cache for the worker), with progress. */
+/** Downloads the model (kept) and the WASM (warms the HTTP cache for the tracker), with progress. */
 async function fetchAssets(onProgress: (p: number) => void) {
   const total = ASSETS.reduce((s, [, n]) => s + n, 0);
   const done = ASSETS.map(() => 0);
@@ -73,26 +153,18 @@ async function fetchAssets(onProgress: (p: number) => void) {
 
 export async function startHands(o: Options): Promise<HandsSession> {
   let stream = await openCamera();
-  let delegate = '?';
-  const worker = new Worker(new URL('./hands.worker.ts', import.meta.url), { type: 'module' });
+  let detector: Detector;
+  // Results arrive here from either detector; set below once the session is wired.
+  let handle: OnHands = () => {};
+  const onHands: OnHands = (h, t) => handle(h, t);
   try {
     const model = await timeout(fetchAssets(o.onProgress), MODEL_TIMEOUT, 'hand model');
-    await timeout(
-      new Promise<void>((resolve, reject) => {
-        worker.onmessage = (e) => {
-          if (e.data.type !== 'ready') return reject(new Error(e.data.message));
-          delegate = e.data.delegate;
-          resolve();
-        };
-        worker.onerror = (e) => reject(new Error(e.message));
-        worker.postMessage({ type: 'init', model }, [model]);
-      }),
-      MODEL_TIMEOUT,
-      'hand tracker',
-    );
+    detector = await timeout(pageDetector(model.slice(0), onHands), MODEL_TIMEOUT, 'hand tracker').catch((e) => {
+      console.warn('GPU hand tracker unavailable, using the worker', e);
+      return workerDetector(model, onHands);
+    });
   } catch (e) {
     stream.getTracks().forEach((t) => t.stop());
-    worker.terminate();
     throw e;
   }
 
@@ -112,44 +184,34 @@ export async function startHands(o: Options): Promise<HandsSession> {
   const stats = { frames: 0, found: 0, since: performance.now() };
   // Calibration aid: only numbers (21 points per hand), capped at ~3 min, never sent anywhere.
   const rec = new URLSearchParams(location.search).has('gravar') ? ([] as { t: number; hands: { label: string; lm: number[] }[] }[]) : null;
-  let busy = false;
   let paused = false;
   let stopped = false;
 
-  worker.onmessage = (e) => {
-    if (e.data.type !== 'result') return;
-    busy = false;
-    const hands = e.data.hands as HandFrame[];
-    // Diagnostics for ?debug: tracker speed and how often a hand is actually found.
+  handle = (hands, t) => {
+    // Diagnostics: tracker speed and how often a hand is actually found.
     stats.frames++;
     if (hands.length) stats.found++;
-    if (e.data.t - stats.since > 1000) {
+    if (t - stats.since > 1000) {
       const s = video.srcObject instanceof MediaStream ? video.srcObject.getVideoTracks()[0]?.getSettings() : undefined;
-      tracker.text = `tracker ${delegate} ${Math.round((stats.frames * 1000) / (e.data.t - stats.since))} fps · hand found ${Math.round((stats.found / Math.max(1, stats.frames)) * 100)}% · camera ${s?.width}×${s?.height} @${Math.round(s?.frameRate ?? 0)}`;
+      tracker.fps = Math.round((stats.frames * 1000) / (t - stats.since));
+      tracker.text = `tracker ${detector.kind} ${tracker.fps} fps · hand found ${Math.round((stats.found / Math.max(1, stats.frames)) * 100)}% · camera ${s?.width}×${s?.height} @${Math.round(s?.frameRate ?? 0)}`;
       stats.frames = stats.found = 0;
-      stats.since = e.data.t;
+      stats.since = t;
     }
-    if (rec && rec.length < 6000) rec.push({ t: Math.round(e.data.t), hands: hands.map((h) => ({ label: h.label, lm: Array.from(h.landmarks, (v) => Math.round(v * 1e4) / 1e4) })) });
-    o.onCursors(gestures.update(hands, e.data.t));
+    if (rec && rec.length < 6000) rec.push({ t: Math.round(t), hands: hands.map((h) => ({ label: h.label, lm: Array.from(h.landmarks, (v) => Math.round(v * 1e4) / 1e4) })) });
+    o.onCursors(gestures.update(hands, t));
     drawSkeleton(g, sk.width, sk.height, hands);
     const d = hands[0] && handDistance(hands[0].landmarks, aspect);
-    if (d && e.data.t - lastCoach > 4000) {
-      lastCoach = e.data.t;
+    if (d && t - lastCoach > 4000) {
+      lastCoach = t;
       o.onDistance(d);
     }
   };
 
-  // Backpressure: one frame in flight at a time, so a slow machine drops frames instead of lagging.
+  // Every new camera frame goes to the tracker (a busy worker just skips frames instead of lagging).
   const pump = () => {
     if (stopped) return;
-    if (!busy && !paused && video.readyState >= 2) {
-      busy = true;
-      // Hands fill a good part of the frame at desk distance: a 640-wide copy is plenty for the
-      // tracker and much cheaper to copy and send than the full 1280×720.
-      createImageBitmap(video, { resizeWidth: 640, resizeHeight: Math.round((640 * video.videoHeight) / Math.max(1, video.videoWidth)) })
-        .then((bitmap) => worker.postMessage({ type: 'frame', bitmap, t: performance.now() }, [bitmap]))
-        .catch(() => (busy = false));
-    }
+    if (!paused && video.readyState >= 2) detector.send(video, performance.now());
     if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(pump);
     else requestAnimationFrame(pump);
   };
@@ -165,7 +227,7 @@ export async function startHands(o: Options): Promise<HandsSession> {
     stop() {
       stopped = true;
       release();
-      worker.terminate();
+      detector.close();
       video.classList.remove('on');
       sk.classList.remove('on');
       o.onCursors([]);
@@ -183,7 +245,6 @@ export async function startHands(o: Options): Promise<HandsSession> {
       video.srcObject = stream;
       await video.play();
       paused = false;
-      busy = false;
       if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(pump);
     },
   };

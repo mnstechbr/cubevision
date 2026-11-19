@@ -11,7 +11,7 @@ import { createGovernor, createStage } from './engine/stage';
 import { textPoints } from './engine/text';
 import { Vector3 } from 'three/webgpu';
 import { i18n } from './i18n';
-import { tracker as trackerInfo, type HandsSession } from './input/hands';
+import { startHands, tracker as trackerInfo, type HandsSession } from './input/hands';
 import { metrics as handMetrics, zooming } from './input/gestures';
 import { attachPointer, type Intents } from './input/pointer';
 import { ui } from './ui';
@@ -151,6 +151,7 @@ async function boot() {
   const fpsEl = ui.$('#fps');
   const reticle = ui.$('#reticle');
   const guide = ui.$('#hand-guide');
+  const guideFps = ui.$('#hand-guide .hg-fps');
   const zoomInd = ui.$('#zoom-ind');
   fpsEl.hidden = !debug;
   let last = performance.now();
@@ -267,7 +268,6 @@ async function boot() {
   async function startCamera() {
     ui.toast(i18n.t.loadingHands, 0);
     try {
-      const { startHands } = await import('./input/hands');
       hands = await startHands({
         video: ui.$<HTMLVideoElement>('#cam'),
         skeleton: ui.$<HTMLCanvasElement>('#cam-skeleton'),
@@ -276,6 +276,9 @@ async function boot() {
         onCursors: (c) => {
           ui.cursors(c);
           guide.dataset.state = c.length === 0 ? 'none' : c[0].pinch ? 'grab' : 'open';
+          const slow = trackerInfo.fps > 0 && trackerInfo.fps < 20;
+          guideFps.classList.toggle('slow', slow);
+          guideFps.textContent = trackerInfo.fps ? `· ${i18n.t.hgFps} ${trackerInfo.fps}/s${slow ? ` (${i18n.t.hgSlow})` : ''}` : '';
         },
         onProgress: (p) => ui.toast(`${i18n.t.loadingHands} ${Math.round(p * 100)}%`, 0),
       });
